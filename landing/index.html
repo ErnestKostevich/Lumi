@@ -58,7 +58,7 @@
         <a href="#features">Features</a>
         <a href="#pricing">Pricing</a>
         <a href="#faq">FAQ</a>
-        <a href="#download" class="nav-cta">Download free</a>
+        <a href="#download" class="nav-cta">Download</a>
       </div>
     </nav>
 
@@ -255,27 +255,35 @@
     <!-- ====== Download / final CTA ====== -->
     <section id="download" class="download">
       <div class="download-card">
-        <h2>Make focus feel like home.</h2>
-        <p>Get the beta + early-bird pricing.</p>
-        <form class="email-form" id="signup-form-2">
-          <input
-            type="email"
-            required
-            placeholder="your@email.com"
-            class="email-input"
-            name="email"
-            autocomplete="email"
-          />
-          <button type="submit" class="cta">
-            Notify me
-            <span class="cta-arrow">→</span>
-          </button>
-        </form>
-        <div class="download-platforms">
-          <span class="platform-pill">Windows</span>
-          <span class="platform-pill platform-pill-soon">macOS soon</span>
-          <span class="platform-pill platform-pill-soon">Linux soon</span>
-          <span class="platform-pill platform-pill-soon">Steam Q3</span>
+        <h2>Download Lumi</h2>
+        <p>Free forever. ~18MB. No account needed. Runs locally — your data stays on your machine.</p>
+
+        <a
+          id="primary-download"
+          href="https://github.com/ErnestKostevich/Project-0/releases/latest"
+          class="cta cta-large"
+        >
+          <span id="primary-download-label">Download for your OS</span>
+          <span class="cta-arrow">↓</span>
+        </a>
+        <div class="download-versions" id="download-versions">
+          <a class="dl-link" data-os="windows" href="https://github.com/ErnestKostevich/Project-0/releases/latest">
+            <span class="dl-os">Windows</span>
+            <span class="dl-format">.exe installer</span>
+          </a>
+          <a class="dl-link" data-os="macos" href="https://github.com/ErnestKostevich/Project-0/releases/latest">
+            <span class="dl-os">macOS</span>
+            <span class="dl-format">.dmg (universal)</span>
+          </a>
+          <a class="dl-link" data-os="linux" href="https://github.com/ErnestKostevich/Project-0/releases/latest">
+            <span class="dl-os">Linux</span>
+            <span class="dl-format">.AppImage / .deb</span>
+          </a>
+        </div>
+        <div class="download-notice">
+          <strong>Heads up:</strong> v0.0.1 alpha. Windows shows an "unverified publisher" warning
+          (no code-signing cert yet) — click <em>More info → Run anyway</em>. macOS:
+          right-click the .dmg → Open the first time. Steam release planned Q3 with proper signing.
         </div>
       </div>
     </section>
@@ -427,6 +435,35 @@
       }
       handleSignup("signup-form");
       handleSignup("signup-form-2");
+
+      // Detect OS and route the primary Download button to the right installer
+      // from the latest GitHub Release. Filenames match Tauri's bundle naming.
+      (function detectOS() {
+        const ua = navigator.userAgent;
+        const plat = (navigator.userAgentData?.platform || navigator.platform || "").toLowerCase();
+        const release = "https://github.com/ErnestKostevich/Project-0/releases/latest/download";
+
+        let os = "windows";
+        if (/mac|darwin/i.test(plat) || /Mac OS X/i.test(ua)) os = "macos";
+        else if (/linux/i.test(plat)) os = "linux";
+
+        const map = {
+          windows: { url: `${release}/Lumi_0.0.1_x64-setup.exe`, label: "Download for Windows · .exe" },
+          macos:   { url: `${release}/Lumi_0.0.1_universal.dmg`, label: "Download for macOS · .dmg" },
+          linux:   { url: `${release}/lumi_0.0.1_amd64.AppImage`, label: "Download for Linux · .AppImage" },
+        };
+        const primary = document.getElementById("primary-download");
+        const label = document.getElementById("primary-download-label");
+        if (primary && map[os]) {
+          primary.href = map[os].url;
+          label.textContent = map[os].label;
+        }
+        document.querySelectorAll(".dl-link").forEach((a) => {
+          const k = a.dataset.os;
+          if (map[k]) a.href = map[k].url;
+          if (k === os) a.classList.add("dl-link-active");
+        });
+      })();
 
       // Generate falling petals dynamically.
       const petalLayer = document.querySelector(".petals");

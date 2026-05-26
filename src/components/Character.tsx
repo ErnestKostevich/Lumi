@@ -6,6 +6,9 @@ interface CharacterProps {
   size?: number;
   /** 0..1 mouth-open amount, driven by the TTS hook. */
   mouthAmplitude?: number;
+  /** Bumps to trigger reaction expression. */
+  reactionTrigger?: number;
+  onClick?: () => void;
 }
 
 /**
@@ -16,15 +19,21 @@ interface CharacterProps {
  * The user can drop their own .vrm at /public/vrm/character.vrm to replace
  * the bundled sample.
  */
-export function Character({ size = 280, mouthAmplitude = 0 }: CharacterProps) {
+export function Character({ size = 280, mouthAmplitude = 0, reactionTrigger = 0, onClick }: CharacterProps) {
   const [errored, setErrored] = useState(false);
 
   return (
-    <div className="character-wrap" style={{ width: size, height: size, position: "relative" }}>
+    <div
+      className="character-wrap"
+      style={{ width: size, height: size, position: "relative" }}
+      onClick={!errored ? undefined : onClick}
+    >
       {!errored ? (
         <VRMCharacter
           size={size}
           mouthAmplitude={mouthAmplitude}
+          reactionTrigger={reactionTrigger}
+          onClick={onClick}
           onError={() => setErrored(true)}
         />
       ) : (

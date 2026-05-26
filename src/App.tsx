@@ -32,6 +32,7 @@ function App() {
     streaming: false,
   });
   const [mouthAmp, setMouthAmp] = useState(0);
+  const [reactionTick, setReactionTick] = useState(0);
 
   const { settings, setSettings } = useSettings();
 
@@ -64,8 +65,9 @@ function App() {
       pomodoroPhase: pomodoro.phase,
       pomodoroRemaining: pomodoro.remaining,
       characterName: "Lumi",
+      mode: settings.personality,
     }),
-    [settings.userName, settings.userGoals, pomodoro.phase, pomodoro.remaining],
+    [settings.userName, settings.userGoals, pomodoro.phase, pomodoro.remaining, settings.personality],
   );
 
   const onAssistantTurn = useCallback(
@@ -152,7 +154,18 @@ function App() {
         <CharacterScene mood={mood} />
         <div className="character-anchor">
           <AuraGlow mood={mood} />
-          <Character size={300} mouthAmplitude={mouthAmp} />
+          <Character
+            size={300}
+            mouthAmplitude={mouthAmp}
+            reactionTrigger={reactionTick}
+            onClick={() => {
+              setReactionTick((n) => n + 1);
+              const lines = clickReactionsFor(settings.personality);
+              const pick = lines[Math.floor(Math.random() * lines.length)];
+              setLastUtterance({ text: pick, streaming: false });
+              tts.speak(pick);
+            }}
+          />
         </div>
       </div>
 
@@ -216,6 +229,35 @@ function App() {
       />
     </div>
   );
+}
+
+function clickReactionsFor(mode: string): string[] {
+  switch (mode) {
+    case "sassy":
+      return [
+        "Yes, I'm right here. Eyes on the screen.",
+        "Don't poke me — poke your todo list.",
+        "Cute, but unproductive.",
+      ];
+    case "cheerleader":
+      return [
+        "Hi hi! Ready to crush it? ✨",
+        "You came back! Let's go! 🌸",
+        "I see you! Round two? 💪",
+      ];
+    case "formal":
+      return [
+        "How can I help you focus?",
+        "Ready when you are.",
+        "Shall we begin a Pomodoro?",
+      ];
+    default:
+      return [
+        "Hi! Need anything? 🌸",
+        "Hey, you got this ✨",
+        "Tap again if you wanna chat!",
+      ];
+  }
 }
 
 function nudgeForPhase(phase: PomodoroPhase, cyclesDone: number): string | null {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { RECOMMENDED_MODELS } from "../lib/llm";
+import { PERSONALITY_MODES, type PersonalityMode } from "../lib/personality";
 import { checkoutUrl } from "../lib/config";
 import type { Settings } from "../hooks/useSettings";
 import { IconClose, IconEye, IconEyeOff } from "./icons/Icons";
@@ -133,6 +134,24 @@ export function SettingsModal({ open, onClose, settings, onChange, tts, onShowPo
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="settings-row">
+          <span className="settings-label">Personality</span>
+          <select
+            className="settings-input"
+            value={settings.personality}
+            onChange={(e) => onChange({ personality: e.target.value as PersonalityMode })}
+          >
+            {PERSONALITY_MODES.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <span className="settings-hint">
+            {PERSONALITY_MODES.find((p) => p.id === settings.personality)?.description}
+          </span>
         </label>
 
         {/* ============ Voice ============ */}

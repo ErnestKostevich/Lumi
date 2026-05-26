@@ -6,11 +6,14 @@ import { useCallback, useState } from "react";
  * tier ships — localStorage is fine for indie MVP.
  */
 
+import type { PersonalityMode } from "../lib/personality";
+
 export interface Settings {
   openRouterKey: string;
   model: string;
   userName: string;
   userGoals: string;
+  personality: PersonalityMode;
   /** Set true after the user dismisses the Pomodoro intro — don't show it again. */
   pomodoroIntroShown: boolean;
   /** License key from the Pro purchase flow (NOWPayments → webhook → email). */
@@ -22,6 +25,7 @@ const DEFAULTS: Settings = {
   model: "anthropic/claude-3.5-sonnet",
   userName: "",
   userGoals: "",
+  personality: "friendly",
   pomodoroIntroShown: false,
   licenseKey: "",
 };

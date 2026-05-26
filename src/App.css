@@ -389,6 +389,8 @@ input, textarea, select {
 .character-canvas {
   display: block;
   background: transparent;
+}
+.character-canvas.click-through {
   pointer-events: none;
 }
 .character-fallback-layer {
@@ -894,6 +896,13 @@ input, textarea, select {
   color: var(--pink-600);
   font-size: 10px;
   font-family: "JetBrains Mono", "SF Mono", monospace;
+}
+.settings-hint {
+  font-size: 10.5px;
+  color: var(--ink-mute);
+  font-style: italic;
+  margin-top: 2px;
+  line-height: 1.4;
 }
 
 /* ============ Upgrade card ============ */

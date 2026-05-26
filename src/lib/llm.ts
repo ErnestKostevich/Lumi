@@ -124,4 +124,14 @@ export const RECOMMENDED_MODELS: { id: string; label: string; note: string }[] =
     label: "Claude 3.5 Haiku",
     note: "Fast Anthropic model.",
   },
+  {
+    id: "mistralai/mistral-large-2411",
+    label: "Mistral Large",
+    note: "European, strong reasoning.",
+  },
+  {
+    id: "mistralai/mistral-small-2503",
+    label: "Mistral Small",
+    note: "Cheap + fast Mistral.",
+  },
 ];

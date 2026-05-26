@@ -12,8 +12,11 @@ interface Props {
   size?: number;
   /** 0..1 — drives the mouth blendshape when TTS is talking. */
   mouthAmplitude?: number;
+  /** Increments to trigger a click reaction (random expression). */
+  reactionTrigger?: number;
   onReady?: () => void;
   onError?: () => void;
+  onClick?: () => void;
 }
 
 /**
@@ -26,7 +29,14 @@ interface Props {
  * Tries /vrm/character.vrm first (user-supplied), falls back to /vrm/sample.vrm
  * (bundled). If both fail, calls `onError` so the parent can show a fallback.
  */
-export function VRMCharacter({ size = 280, mouthAmplitude = 0, onReady, onError }: Props) {
+export function VRMCharacter({
+  size = 280,
+  mouthAmplitude = 0,
+  reactionTrigger = 0,
+  onReady,
+  onError,
+  onClick,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stateRef = useRef<{
     renderer?: THREE.WebGLRenderer;
@@ -39,7 +49,9 @@ export function VRMCharacter({ size = 280, mouthAmplitude = 0, onReady, onError 
     blinkUntil: number;
     nextBlinkAt: number;
     mouthAmp: number;
-  }>({ blinkUntil: 0, nextBlinkAt: 0, mouthAmp: 0 });
+    /** Active reaction expression name + its end time. */
+    reaction: { name: string; until: number } | null;
+  }>({ blinkUntil: 0, nextBlinkAt: 0, mouthAmp: 0, reaction: null });
   const [state, setState] = useState<LoadState>("loading");
 
   // Update mouth-amplitude ref so the rAF loop reads the freshest value
@@ -47,6 +59,14 @@ export function VRMCharacter({ size = 280, mouthAmplitude = 0, onReady, onError 
   useEffect(() => {
     stateRef.current.mouthAmp = mouthAmplitude;
   }, [mouthAmplitude]);
+
+  // Trigger a random reaction expression when the parent bumps reactionTrigger.
+  useEffect(() => {
+    if (!reactionTrigger) return;
+    const expressions = ["happy", "surprised", "relaxed", "happy", "happy"];
+    const pick = expressions[Math.floor(Math.random() * expressions.length)];
+    stateRef.current.reaction = { name: pick, until: performance.now() + 1400 };
+  }, [reactionTrigger]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -262,6 +282,27 @@ export function VRMCharacter({ size = 280, mouthAmplitude = 0, onReady, onError 
           // ---- Mouth (lip-sync) ----
           const amp = stateRef.current.mouthAmp;
           blink.setValue("aa", Math.max(0, Math.min(1, amp)));
+
+          // ---- Reaction expression (decays smoothly over 1.4s) ----
+          const reaction = stateRef.current.reaction;
+          if (reaction) {
+            if (t < reaction.until) {
+              const remaining = (reaction.until - t) / 1400;
+              const eased = Math.sin(remaining * Math.PI); // 0 → 1 → 0
+              try {
+                blink.setValue(reaction.name, eased);
+              } catch {
+                /* expression name not in model */
+              }
+            } else {
+              try {
+                blink.setValue(reaction.name, 0);
+              } catch {
+                /* ignore */
+              }
+              stateRef.current.reaction = null;
+            }
+          }
         }
 
         // ---- Subtle breathing — bob the whole rig a hair ----
@@ -293,10 +334,14 @@ export function VRMCharacter({ size = 280, mouthAmplitude = 0, onReady, onError 
     <canvas
       ref={canvasRef}
       className="vrm-canvas"
+      onClick={onClick}
       style={{
         width: size,
         height: size,
         display: state === "error" ? "none" : "block",
+        cursor: onClick ? "pointer" : "default",
+        // Click-through stays via App.tsx CSS unless onClick is supplied
+        pointerEvents: onClick ? "auto" : "none",
       }}
     />
   );
