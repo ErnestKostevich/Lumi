@@ -271,13 +271,13 @@
             <span class="dl-os">Windows</span>
             <span class="dl-format">.exe installer</span>
           </a>
-          <a class="dl-link" data-os="macos" href="https://github.com/ErnestKostevich/Project-0/releases/latest">
-            <span class="dl-os">macOS</span>
-            <span class="dl-format">.dmg (universal)</span>
-          </a>
           <a class="dl-link" data-os="linux" href="https://github.com/ErnestKostevich/Project-0/releases/latest">
             <span class="dl-os">Linux</span>
             <span class="dl-format">.AppImage / .deb</span>
+          </a>
+          <a class="dl-link" data-os="macos" href="https://github.com/ErnestKostevich/Project-0/releases/latest">
+            <span class="dl-os">macOS</span>
+            <span class="dl-format">Coming v0.0.2</span>
           </a>
         </div>
         <div class="download-notice">
@@ -491,21 +491,39 @@
         if (/mac|darwin/i.test(plat) || /Mac OS X/i.test(ua)) os = "macos";
         else if (/linux/i.test(plat)) os = "linux";
 
+        // Filenames match the artifacts in https://github.com/ErnestKostevich/Project-0/releases/tag/v0.0.1
         const map = {
-          windows: { url: `${release}/Lumi_0.0.1_x64-setup.exe`, label: "Download for Windows · .exe" },
-          macos:   { url: `${release}/Lumi_0.0.1_universal.dmg`, label: "Download for macOS · .dmg" },
-          linux:   { url: `${release}/lumi_0.0.1_amd64.AppImage`, label: "Download for Linux · .AppImage" },
+          windows: {
+            url: `${release}/Lumi_0.0.1_x64-setup.exe`,
+            label: "Download for Windows · .exe",
+            available: true,
+          },
+          linux: {
+            url: `${release}/Lumi_0.0.1_amd64.AppImage`,
+            label: "Download for Linux · .AppImage",
+            available: true,
+          },
+          macos: {
+            // No .dmg in v0.0.1 release — macOS build pending v0.0.2.
+            url: "https://github.com/ErnestKostevich/Project-0/issues/new?title=macOS+build+request",
+            label: "macOS — coming in v0.0.2",
+            available: false,
+          },
         };
         const primary = document.getElementById("primary-download");
         const label = document.getElementById("primary-download-label");
         if (primary && map[os]) {
           primary.href = map[os].url;
           label.textContent = map[os].label;
+          if (!map[os].available) primary.classList.add("cta-disabled");
         }
         document.querySelectorAll(".dl-link").forEach((a) => {
           const k = a.dataset.os;
-          if (map[k]) a.href = map[k].url;
-          if (k === os) a.classList.add("dl-link-active");
+          if (map[k]) {
+            a.href = map[k].url;
+            if (!map[k].available) a.classList.add("dl-link-soon");
+          }
+          if (k === os && map[k]?.available) a.classList.add("dl-link-active");
         });
       })();
 

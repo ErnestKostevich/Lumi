@@ -810,6 +810,19 @@ section { position: relative; }
   border-color: var(--pink-400);
   box-shadow: 0 6px 14px rgba(255, 103, 137, 0.18);
 }
+.dl-link-soon {
+  opacity: 0.55;
+  background: var(--cream);
+}
+.dl-link-soon .dl-format {
+  font-style: italic;
+  color: var(--pink-500);
+}
+.cta-disabled {
+  opacity: 0.6;
+  background: linear-gradient(135deg, var(--ink-mute), var(--ink-soft)) !important;
+  pointer-events: none;
+}
 .dl-os {
   font-weight: 700;
   font-size: 14px;
