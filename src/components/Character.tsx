@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { VRMCharacter } from "./VRMCharacter";
+import { VRMCharacter, type Mood } from "./VRMCharacter";
 import { FallbackCharacter } from "./FallbackCharacter";
 
 interface CharacterProps {
@@ -8,6 +8,8 @@ interface CharacterProps {
   mouthAmplitude?: number;
   /** Bumps to trigger reaction expression. */
   reactionTrigger?: number;
+  /** Affects idle animation intensity (focus = calmer, break = livelier). */
+  mood?: Mood;
   onClick?: () => void;
 }
 
@@ -19,7 +21,13 @@ interface CharacterProps {
  * The user can drop their own .vrm at /public/vrm/character.vrm to replace
  * the bundled sample.
  */
-export function Character({ size = 280, mouthAmplitude = 0, reactionTrigger = 0, onClick }: CharacterProps) {
+export function Character({
+  size = 280,
+  mouthAmplitude = 0,
+  reactionTrigger = 0,
+  mood = "idle",
+  onClick,
+}: CharacterProps) {
   const [errored, setErrored] = useState(false);
 
   return (
@@ -33,6 +41,7 @@ export function Character({ size = 280, mouthAmplitude = 0, reactionTrigger = 0,
           size={size}
           mouthAmplitude={mouthAmplitude}
           reactionTrigger={reactionTrigger}
+          mood={mood}
           onClick={onClick}
           onError={() => setErrored(true)}
         />

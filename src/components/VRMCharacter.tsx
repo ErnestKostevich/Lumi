@@ -7,6 +7,7 @@ const DEFAULT_VRM_PATH = "/vrm/character.vrm";
 const FALLBACK_VRM_PATH = "/vrm/sample.vrm";
 
 type LoadState = "loading" | "ready" | "error";
+export type Mood = "idle" | "focus" | "break";
 
 interface Props {
   size?: number;
@@ -14,47 +15,45 @@ interface Props {
   mouthAmplitude?: number;
   /** Increments to trigger a click reaction (random expression). */
   reactionTrigger?: number;
+  /** Affects animation intensity (focus = calmer, break = livelier). */
+  mood?: Mood;
   onReady?: () => void;
   onError?: () => void;
   onClick?: () => void;
 }
 
 /**
- * Renders a VRM 3D avatar on a transparent canvas via three.js.
- * - Procedural breathing (gentle bob + scale)
- * - Periodic blink via the model's blink expression
- * - Cursor look-at via VRMLookAt
- * - Mouth blendshape driven by `mouthAmplitude` prop (lip-sync hook)
- * - Rest pose: arms hanging down (no T-pose), with subtle idle sway
- *
- * Tries /vrm/character.vrm first (user-supplied), falls back to /vrm/sample.vrm
- * (bundled). If both fail, calls `onError` so the parent can show a fallback.
+ * VRM avatar with rich procedural idle animations:
+ *   - Multi-frequency breathing (chest rise + subtle head bob)
+ *   - Wandering eye look-at (idle drift when cursor still > 8s)
+ *   - Periodic wave gesture (every 60-120s)
+ *   - Periodic stretch (every 4-5 min — head back + arms up)
+ *   - Baseline smile via 'happy' blendshape (0.12)
+ *   - Blink, lip-sync, click-reaction (carried over)
+ *   - Mood-aware amplitude: focus = calmer, break = livelier
  */
 
-/**
- * Apply natural arms-down rest pose to a freshly loaded VRM.
- * VRMs default to T-pose because rest skinning is bound that way.
- * We rotate the upper-arm bones ~72° around their local Z so they hang,
- * add a small elbow bend, and relax the hands inward.
- */
 function applyRestPose(vrm: VRM) {
   const set = (name: string, x: number, y: number, z: number) => {
     const bone = vrm.humanoid?.getRawBoneNode(name as never);
     if (bone) bone.rotation.set(x, y, z);
   };
-  // Upper arms: positive Z for left, negative for right brings them down.
   set("leftUpperArm", 0, 0, 1.2);
   set("rightUpperArm", 0, 0, -1.2);
-  // Slight forward bend at elbow + hand for relaxed posture.
   set("leftLowerArm", 0, 0, 0.18);
   set("rightLowerArm", 0, 0, -0.18);
   set("leftHand", 0, 0, 0.1);
   set("rightHand", 0, 0, -0.1);
 }
+
+/** Smooth ease-in-out cubic (0..1 → 0..1). */
+const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+
 export function VRMCharacter({
   size = 280,
   mouthAmplitude = 0,
   reactionTrigger = 0,
+  mood = "idle",
   onReady,
   onError,
   onClick,
@@ -68,40 +67,79 @@ export function VRMCharacter({
     lookTarget?: THREE.Object3D;
     clock?: THREE.Clock;
     raf?: number;
+    /** Blink scheduling. */
     blinkUntil: number;
     nextBlinkAt: number;
+    /** TTS lip-sync. */
     mouthAmp: number;
+    /** Click reaction state. */
     reaction: { name: string; until: number } | null;
-    /** Cached references + base rotations for the idle sway loop. */
-    armRest: {
+    /** Mood prop mirror (set by effect). */
+    mood: Mood;
+    /** Cached bone refs + rest-pose base rotations. */
+    bones: {
       leftUpperArm: THREE.Object3D | null;
       rightUpperArm: THREE.Object3D | null;
+      leftLowerArm: THREE.Object3D | null;
+      rightLowerArm: THREE.Object3D | null;
       head: THREE.Object3D | null;
+      neck: THREE.Object3D | null;
+      chest: THREE.Object3D | null;
       baseLeftUpperArmZ: number;
       baseRightUpperArmZ: number;
+      baseLeftLowerArmZ: number;
+      baseRightLowerArmZ: number;
     };
+    /** Wave gesture scheduling. */
+    nextWaveAt: number;
+    waveStartedAt: number | null;
+    waveDuration: number;
+    /** Stretch gesture scheduling. */
+    nextStretchAt: number;
+    stretchStartedAt: number | null;
+    stretchDuration: number;
+    /** Eye-drift idle: timestamp of last user-driven look-target change. */
+    lastCursorMoveAt: number;
+    /** Frame center reference (filled at load) for default look target. */
+    frameCenter: { x: number; y: number; z: number };
   }>({
     blinkUntil: 0,
     nextBlinkAt: 0,
     mouthAmp: 0,
     reaction: null,
-    armRest: {
+    mood: "idle",
+    bones: {
       leftUpperArm: null,
       rightUpperArm: null,
+      leftLowerArm: null,
+      rightLowerArm: null,
       head: null,
+      neck: null,
+      chest: null,
       baseLeftUpperArmZ: 0,
       baseRightUpperArmZ: 0,
+      baseLeftLowerArmZ: 0,
+      baseRightLowerArmZ: 0,
     },
+    nextWaveAt: 0,
+    waveStartedAt: null,
+    waveDuration: 2200,
+    nextStretchAt: 0,
+    stretchStartedAt: null,
+    stretchDuration: 1800,
+    lastCursorMoveAt: 0,
+    frameCenter: { x: 0, y: 1.4, z: 0 },
   });
   const [state, setState] = useState<LoadState>("loading");
 
-  // Update mouth-amplitude ref so the rAF loop reads the freshest value
-  // without retriggering the effect.
   useEffect(() => {
     stateRef.current.mouthAmp = mouthAmplitude;
   }, [mouthAmplitude]);
 
-  // Trigger a random reaction expression when the parent bumps reactionTrigger.
+  useEffect(() => {
+    stateRef.current.mood = mood;
+  }, [mood]);
+
   useEffect(() => {
     if (!reactionTrigger) return;
     const expressions = ["happy", "surprised", "relaxed", "happy", "happy"];
@@ -127,7 +165,6 @@ export function VRMCharacter({
 
     const scene = new THREE.Scene();
 
-    // Soft sakura-ish key light + neutral fill.
     const key = new THREE.DirectionalLight(0xfff0f3, 1.4);
     key.position.set(0.8, 2.5, 1.5);
     scene.add(key);
@@ -151,7 +188,11 @@ export function VRMCharacter({
     stateRef.current.camera = camera;
     stateRef.current.lookTarget = lookTarget;
     stateRef.current.clock = clock;
-    stateRef.current.nextBlinkAt = performance.now() + 2500 + Math.random() * 2500;
+    const now0 = performance.now();
+    stateRef.current.nextBlinkAt = now0 + 2500 + Math.random() * 2500;
+    stateRef.current.nextWaveAt = now0 + 30_000 + Math.random() * 60_000;
+    stateRef.current.nextStretchAt = now0 + 4 * 60_000 + Math.random() * 60_000;
+    stateRef.current.lastCursorMoveAt = now0;
 
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
@@ -171,71 +212,64 @@ export function VRMCharacter({
             return;
           }
 
-          // Optimisation passes recommended by @pixiv/three-vrm docs.
           VRMUtils.removeUnnecessaryVertices(gltf.scene);
           VRMUtils.combineSkeletons(gltf.scene);
           vrm.scene.traverse((obj) => {
             obj.frustumCulled = false;
           });
 
-          // Step 1: rotate VRM 0.x (no-op on 1.0).
           VRMUtils.rotateVRM0(vrm);
-
-          // Step 2: FORCE additional 180° rotation. Our bundled VRoid exports
-          // (Shino + AvatarSample_*) all face -Z despite being marked 1.0 —
-          // VRMUtils.rotateVRM0 only fixes 0.x. We always need the extra flip.
-          // If users later supply a properly-exported VRM 1.0 that faces +Z,
-          // we can expose a settings toggle then.
           vrm.scene.rotation.y += Math.PI;
           vrm.scene.updateMatrixWorld(true);
 
-          // Step 3: apply natural REST POSE (arms down) — VRMs ship in T-pose
-          // by default, which looks creepy. We rotate upper arms to hang
-          // by the sides, add elbow bend, settle hands.
           applyRestPose(vrm);
           vrm.scene.updateMatrixWorld(true);
 
           scene.add(vrm.scene);
           stateRef.current.vrm = vrm;
 
-          // Cache bone refs + base rotations for the idle-sway tick loop.
-          const luArm = vrm.humanoid?.getRawBoneNode("leftUpperArm") as THREE.Object3D | undefined;
-          const ruArm = vrm.humanoid?.getRawBoneNode("rightUpperArm") as THREE.Object3D | undefined;
-          const headBone = vrm.humanoid?.getRawBoneNode("head") as THREE.Object3D | undefined;
-          stateRef.current.armRest = {
-            leftUpperArm: luArm ?? null,
-            rightUpperArm: ruArm ?? null,
-            head: headBone ?? null,
+          // Cache all bones we animate.
+          const getBone = (n: string) =>
+            (vrm.humanoid?.getRawBoneNode(n as never) as THREE.Object3D | undefined) ?? null;
+          const luArm = getBone("leftUpperArm");
+          const ruArm = getBone("rightUpperArm");
+          const llArm = getBone("leftLowerArm");
+          const rlArm = getBone("rightLowerArm");
+          const headBone = getBone("head");
+          const neckBone = getBone("neck");
+          const chestBone =
+            getBone("chest") || getBone("upperChest") || getBone("spine");
+
+          stateRef.current.bones = {
+            leftUpperArm: luArm,
+            rightUpperArm: ruArm,
+            leftLowerArm: llArm,
+            rightLowerArm: rlArm,
+            head: headBone,
+            neck: neckBone,
+            chest: chestBone,
             baseLeftUpperArmZ: luArm?.rotation.z ?? 0,
             baseRightUpperArmZ: ruArm?.rotation.z ?? 0,
+            baseLeftLowerArmZ: llArm?.rotation.z ?? 0,
+            baseRightLowerArmZ: rlArm?.rotation.z ?? 0,
           };
 
-          // Step 4: compute upper-body frame (head + chest) using bones.
-          const head = vrm.humanoid?.getRawBoneNode("head");
-          const chest =
-            vrm.humanoid?.getRawBoneNode("chest") ||
-            vrm.humanoid?.getRawBoneNode("upperChest") ||
-            vrm.humanoid?.getRawBoneNode("spine");
-
+          // ---- Camera framing (head + chest down to waist) ----
           let frameTopY = 1.6;
           let frameBottomY = 1.2;
           let frameCenterX = 0;
           let frameCenterY = 1.4;
           let frameCenterZ = 0;
-          // FIXED frameWidth = ~55cm covers head + hair + shoulders generously.
-          // Don't use fullSize.x because T-pose hands/sleeves balloon the bbox.
           const frameWidth = 0.55;
-
           const fullBox = new THREE.Box3().setFromObject(vrm.scene);
 
-          if (head) {
-            const hp = head.getWorldPosition(new THREE.Vector3());
+          if (headBone) {
+            const hp = headBone.getWorldPosition(new THREE.Vector3());
             frameCenterX = hp.x;
             frameCenterZ = hp.z;
-            frameTopY = hp.y + 0.18; // less headroom, more body
-            if (chest) {
-              const cp = chest.getWorldPosition(new THREE.Vector3());
-              // Show head + full upper torso down to waist for natural framing
+            frameTopY = hp.y + 0.18;
+            if (chestBone) {
+              const cp = chestBone.getWorldPosition(new THREE.Vector3());
               frameBottomY = cp.y - 0.4;
             } else {
               frameBottomY = hp.y - 0.7;
@@ -257,15 +291,16 @@ export function VRMCharacter({
           const distanceW = (frameWidth / 2 / Math.tan(fovRad / 2)) * 1.1;
           const distance = Math.max(distanceH, distanceW);
 
-          // After our forced flip, character faces +Z, so camera goes +Z.
           camera.position.set(frameCenterX, frameCenterY, frameCenterZ + distance);
           camera.lookAt(frameCenterX, frameCenterY, frameCenterZ);
           lookTarget.position.set(frameCenterX, frameCenterY + 0.1, frameCenterZ + 1);
+          stateRef.current.frameCenter = {
+            x: frameCenterX,
+            y: frameCenterY,
+            z: frameCenterZ,
+          };
 
-          // Wire VRM look-at to our movable target.
-          if (vrm.lookAt) {
-            vrm.lookAt.target = lookTarget;
-          }
+          if (vrm.lookAt) vrm.lookAt.target = lookTarget;
 
           setState("ready");
           onReady?.();
@@ -285,13 +320,12 @@ export function VRMCharacter({
 
     const onMouseMove = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
-      // Normalise cursor to camera local space ~ NDC. Then push out as a world point.
       const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       const ndcY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
       const v = new THREE.Vector3(ndcX, ndcY, 0.5).unproject(camera);
       lookTarget.position.copy(v);
+      stateRef.current.lastCursorMoveAt = performance.now();
     };
-    // Use window-wide tracking — the character looks even when mouse is outside the canvas.
     window.addEventListener("mousemove", onMouseMove);
 
     const tick = () => {
@@ -299,69 +333,179 @@ export function VRMCharacter({
       const t = performance.now();
       const dt = clock.getDelta();
       const vrm = stateRef.current.vrm;
+      const s = stateRef.current;
 
       if (vrm) {
         vrm.update(dt);
 
+        // Mood-based intensity multiplier. Focus = 0.6 (still), break = 1.4 (lively).
+        const moodMul =
+          s.mood === "focus" ? 0.6 : s.mood === "break" ? 1.4 : 1.0;
+
         // ---- Procedural blink ----
-        const blink = vrm.expressionManager;
-        if (blink) {
-          if (t < stateRef.current.blinkUntil) {
-            blink.setValue("blink", 1);
+        const expr = vrm.expressionManager;
+        if (expr) {
+          if (t < s.blinkUntil) {
+            expr.setValue("blink", 1);
           } else {
-            blink.setValue("blink", 0);
-            if (t > stateRef.current.nextBlinkAt) {
-              stateRef.current.blinkUntil = t + 130;
-              stateRef.current.nextBlinkAt = t + 2800 + Math.random() * 2800;
+            expr.setValue("blink", 0);
+            if (t > s.nextBlinkAt) {
+              s.blinkUntil = t + 130;
+              // Faster cycle when lively, slower when focused.
+              const base = s.mood === "focus" ? 3500 : s.mood === "break" ? 2400 : 2800;
+              s.nextBlinkAt = t + base + Math.random() * base;
             }
           }
 
-          // ---- Mouth (lip-sync) ----
-          const amp = stateRef.current.mouthAmp;
-          blink.setValue("aa", Math.max(0, Math.min(1, amp)));
+          // ---- Baseline soft smile + mouth + reaction ----
+          // Subtle baseline happy keeps the face friendly, not blank.
+          try {
+            expr.setValue("happy", 0.12);
+          } catch {
+            /* model lacks 'happy' */
+          }
 
-          // ---- Reaction expression (decays smoothly over 1.4s) ----
-          const reaction = stateRef.current.reaction;
+          // Lip-sync overrides baseline mouth.
+          const amp = s.mouthAmp;
+          expr.setValue("aa", Math.max(0, Math.min(1, amp)));
+
+          // Click reaction expression (decays smoothly over 1.4s).
+          const reaction = s.reaction;
           if (reaction) {
             if (t < reaction.until) {
               const remaining = (reaction.until - t) / 1400;
-              const eased = Math.sin(remaining * Math.PI); // 0 → 1 → 0
+              const eased = Math.sin(remaining * Math.PI);
               try {
-                blink.setValue(reaction.name, eased);
-              } catch {
-                /* expression name not in model */
-              }
-            } else {
-              try {
-                blink.setValue(reaction.name, 0);
+                // Layer on top of baseline smile (so it adds, not replaces).
+                expr.setValue(reaction.name, Math.min(1, 0.12 + eased));
               } catch {
                 /* ignore */
               }
-              stateRef.current.reaction = null;
+            } else {
+              try {
+                expr.setValue(reaction.name, 0.12);
+              } catch {
+                /* ignore */
+              }
+              s.reaction = null;
             }
           }
         }
 
-        // ---- Subtle breathing + idle motion ----
+        // ---- Multi-frequency breathing (chest + whole rig) ----
         const phase = t / 1000;
-        // Whole-rig vertical bob (chest breathing illusion)
-        vrm.scene.position.y = Math.sin(phase * 1.6) * 0.005;
-        // Gentle Y-rotation around the forced-flip baseline (Math.PI).
-        vrm.scene.rotation.y = Math.PI + Math.sin(phase * 0.45) * 0.06;
+        // Two superimposed sins read more organic than single sin.
+        const breath = Math.sin(phase * 1.5) * 0.004 + Math.sin(phase * 2.3) * 0.0015;
+        vrm.scene.position.y = breath * moodMul;
+        // Slow Y drift around the forced 180° baseline.
+        vrm.scene.rotation.y = Math.PI + Math.sin(phase * 0.4) * 0.05 * moodMul;
 
-        // Procedural idle: gentle arm sway + head tilt + neck breathing.
-        const arms = stateRef.current.armRest;
-        if (arms.leftUpperArm) {
-          arms.leftUpperArm.rotation.z =
-            arms.baseLeftUpperArmZ + Math.sin(phase * 0.7) * 0.025;
+        // ---- Idle look-around when cursor is still ----
+        const idleMs = t - s.lastCursorMoveAt;
+        if (idleMs > 8000 && s.lookTarget) {
+          // Random-walk drift around the frame center.
+          const dx = Math.sin(phase * 0.35) * 0.4 + Math.sin(phase * 0.18) * 0.25;
+          const dy = Math.cos(phase * 0.42) * 0.2;
+          s.lookTarget.position.set(
+            s.frameCenter.x + dx,
+            s.frameCenter.y + 0.1 + dy,
+            s.frameCenter.z + 1,
+          );
         }
-        if (arms.rightUpperArm) {
-          arms.rightUpperArm.rotation.z =
-            arms.baseRightUpperArmZ - Math.sin(phase * 0.7) * 0.025;
+
+        const bones = s.bones;
+
+        // ---- Head + neck idle motion (subtle 3-axis sway) ----
+        if (bones.head) {
+          bones.head.rotation.z = Math.sin(phase * 0.4) * 0.04 * moodMul;
+          bones.head.rotation.x = Math.sin(phase * 0.55) * 0.02 * moodMul;
         }
-        if (arms.head) {
-          arms.head.rotation.z = Math.sin(phase * 0.4) * 0.04;
-          arms.head.rotation.x = Math.sin(phase * 0.6) * 0.02;
+        if (bones.neck) {
+          // Tiny counter-rotation so head+neck don't move as a single rigid block.
+          bones.neck.rotation.x = Math.sin(phase * 0.55) * 0.012 * moodMul;
+        }
+
+        // ---- Periodic WAVE gesture (every 30s-90s in idle, suppressed in focus) ----
+        if (
+          s.waveStartedAt === null &&
+          t > s.nextWaveAt &&
+          s.mood !== "focus"
+        ) {
+          s.waveStartedAt = t;
+        }
+
+        const armSway = Math.sin(phase * 0.7) * 0.025 * moodMul;
+
+        if (s.waveStartedAt !== null && bones.leftUpperArm && bones.leftLowerArm) {
+          const elapsed = t - s.waveStartedAt;
+          if (elapsed > s.waveDuration) {
+            s.waveStartedAt = null;
+            const base = s.mood === "break" ? 25_000 : 45_000;
+            s.nextWaveAt = t + base + Math.random() * 60_000;
+            // Return to baseline next frame
+            bones.leftUpperArm.rotation.z = bones.baseLeftUpperArmZ;
+            bones.leftLowerArm.rotation.z = bones.baseLeftLowerArmZ;
+            bones.leftLowerArm.rotation.x = 0;
+          } else {
+            const t01 = elapsed / s.waveDuration;
+            // arch: 0 → 1 → 0 over duration
+            const arch = Math.sin(ease(t01) * Math.PI);
+            // Raise left arm (rotate Z towards 0 = horizontal, then a bit beyond)
+            bones.leftUpperArm.rotation.z = bones.baseLeftUpperArmZ - arch * 1.4;
+            // Forearm comes up + slight wave waggle
+            bones.leftLowerArm.rotation.z = bones.baseLeftLowerArmZ - arch * 0.6;
+            bones.leftLowerArm.rotation.x =
+              arch * Math.sin(elapsed * 0.018) * 0.3; // hand waves side to side
+            // Right arm just idle
+            if (bones.rightUpperArm) {
+              bones.rightUpperArm.rotation.z = bones.baseRightUpperArmZ - armSway;
+            }
+          }
+        } else {
+          // ---- Normal idle arm sway ----
+          if (bones.leftUpperArm) {
+            bones.leftUpperArm.rotation.z = bones.baseLeftUpperArmZ + armSway;
+          }
+          if (bones.rightUpperArm) {
+            bones.rightUpperArm.rotation.z = bones.baseRightUpperArmZ - armSway;
+          }
+          if (bones.leftLowerArm) {
+            bones.leftLowerArm.rotation.z = bones.baseLeftLowerArmZ;
+            bones.leftLowerArm.rotation.x = 0;
+          }
+          if (bones.rightLowerArm) {
+            bones.rightLowerArm.rotation.z = bones.baseRightLowerArmZ;
+            bones.rightLowerArm.rotation.x = 0;
+          }
+        }
+
+        // ---- Periodic STRETCH (every 4-5min, head back + arms up briefly) ----
+        if (
+          s.stretchStartedAt === null &&
+          t > s.nextStretchAt &&
+          s.waveStartedAt === null
+        ) {
+          s.stretchStartedAt = t;
+        }
+        if (s.stretchStartedAt !== null) {
+          const elapsed = t - s.stretchStartedAt;
+          if (elapsed > s.stretchDuration) {
+            s.stretchStartedAt = null;
+            s.nextStretchAt = t + 4 * 60_000 + Math.random() * 60_000;
+          } else {
+            const t01 = elapsed / s.stretchDuration;
+            const arch = Math.sin(ease(t01) * Math.PI);
+            if (bones.head) bones.head.rotation.x = -arch * 0.18;
+            if (bones.leftUpperArm) {
+              bones.leftUpperArm.rotation.z = bones.baseLeftUpperArmZ + arch * 0.35;
+            }
+            if (bones.rightUpperArm) {
+              bones.rightUpperArm.rotation.z = bones.baseRightUpperArmZ - arch * 0.35;
+            }
+            if (bones.chest) {
+              bones.chest.rotation.x = -arch * 0.05;
+            }
+          }
         }
       }
 
@@ -394,7 +538,6 @@ export function VRMCharacter({
         height: size,
         display: state === "error" ? "none" : "block",
         cursor: onClick ? "pointer" : "default",
-        // Click-through stays via App.tsx CSS unless onClick is supplied
         pointerEvents: onClick ? "auto" : "none",
       }}
     />

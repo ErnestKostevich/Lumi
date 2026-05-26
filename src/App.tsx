@@ -159,6 +159,7 @@ function App() {
             size={300}
             mouthAmplitude={mouthAmp}
             reactionTrigger={reactionTick}
+            mood={mood}
             onClick={() => {
               setReactionTick((n) => n + 1);
               const lines = clickReactionsFor(settings.personality);
