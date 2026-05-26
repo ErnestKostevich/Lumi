@@ -22,6 +22,11 @@ export interface Settings {
   pomodoroIntroShown: boolean;
   /** Show all OS voices (including male) in the voice picker. Default false = female-only. */
   showAllVoices: boolean;
+  /** When true, hide Lumi when another app is fullscreen (game/video). */
+  hideOnFullscreen: boolean;
+  /** ElevenLabs Pro voice. Empty = use OS Web Speech voices. */
+  elevenLabsKey: string;
+  elevenLabsVoiceId: string;
   /** License key from the Pro purchase flow (NOWPayments → webhook → email). */
   licenseKey: string;
 }
@@ -36,6 +41,9 @@ const DEFAULTS: Settings = {
   personality: "friendly",
   pomodoroIntroShown: false,
   showAllVoices: false,
+  hideOnFullscreen: true,
+  elevenLabsKey: "",
+  elevenLabsVoiceId: "21m00Tcm4TlvDq8ikWAM",
   licenseKey: "",
 };
 

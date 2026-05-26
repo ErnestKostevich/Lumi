@@ -22,6 +22,9 @@ import { useChat } from "./hooks/useChat";
 import { usePomodoro, type PomodoroPhase } from "./hooks/usePomodoro";
 import { useTTS } from "./hooks/useTTS";
 import { useActiveWindow } from "./hooks/useActiveWindow";
+import { useSnapToEdge } from "./hooks/useSnapToEdge";
+import { useHideOnFullscreen } from "./hooks/useHideOnFullscreen";
+import { loadRecentMessages, appendMessage, clearMessages } from "./lib/db";
 import "./App.css";
 
 function App() {
@@ -49,9 +52,13 @@ function App() {
     onAmplitude: setMouthAmp,
     enabled: true,
     showAllVoices: settings.showAllVoices,
+    elevenLabsKey: settings.elevenLabsKey,
+    elevenLabsVoiceId: settings.elevenLabsVoiceId,
   });
   const activeWin = useActiveWindow(8000);
   const distractionNudgedRef = useRef<number>(0);
+  useSnapToEdge();
+  useHideOnFullscreen(settings.hideOnFullscreen);
 
   const handlePhaseChange = useCallback(
     (phase: PomodoroPhase, cyclesDone: number) => {
@@ -105,6 +112,34 @@ function App() {
     buildContext,
     onAssistantTurn,
   });
+
+  // ---- SQLite chat history: load on mount + append on each finalized turn ----
+  const persistedUpTo = useRef(0);
+  useEffect(() => {
+    loadRecentMessages(40).then((past) => {
+      if (past.length) {
+        chat.setTurns(past);
+        persistedUpTo.current = past.length;
+      }
+    }).catch(() => {/* db unavailable in browser preview */});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    for (let i = persistedUpTo.current; i < chat.turns.length; i++) {
+      const t = chat.turns[i];
+      if (t.streaming) return; // still streaming — wait until next render
+      if (!t.content.trim()) continue;
+      void appendMessage(t.role, t.content);
+      persistedUpTo.current = i + 1;
+    }
+  }, [chat.turns]);
+
+  const handleClearChat = useCallback(() => {
+    chat.clear();
+    persistedUpTo.current = 0;
+    void clearMessages();
+  }, [chat]);
 
   const liveBubble = useMemo(() => {
     const last = chat.turns[chat.turns.length - 1];
@@ -245,7 +280,7 @@ function App() {
         turns={chat.turns}
         busy={chat.busy}
         onSend={chat.send}
-        onClear={chat.clear}
+        onClear={handleClearChat}
       />
       <SettingsModal
         open={settingsOpen}

@@ -28,9 +28,15 @@ function genId(): string {
 }
 
 export function useChat({ provider, apiKey, model, buildContext, onAssistantTurn }: UseChatOpts) {
-  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [turns, setTurnsState] = useState<ChatTurn[]>([]);
   const [busy, setBusy] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
+
+  // External setter — used by App.tsx to seed history loaded from SQLite.
+  const setTurns = useCallback((next: ChatTurn[] | ((prev: ChatTurn[]) => ChatTurn[])) => {
+    if (typeof next === "function") setTurnsState(next);
+    else setTurnsState(next);
+  }, []);
 
   const send = useCallback(
     async (text: string) => {
@@ -44,7 +50,7 @@ export function useChat({ provider, apiKey, model, buildContext, onAssistantTurn
           provider === "mistral"
             ? "console.mistral.ai/api-keys"
             : "openrouter.ai/keys";
-        setTurns((t) => [
+        setTurnsState((t) => [
           ...t,
           { id: genId(), role: "user", content: trimmed },
           {
@@ -58,7 +64,7 @@ export function useChat({ provider, apiKey, model, buildContext, onAssistantTurn
 
       const userTurn: ChatTurn = { id: genId(), role: "user", content: trimmed };
       const assistantId = genId();
-      setTurns((t) => [
+      setTurnsState((t) => [
         ...t,
         userTurn,
         { id: assistantId, role: "assistant", content: "", streaming: true },
@@ -82,19 +88,19 @@ export function useChat({ provider, apiKey, model, buildContext, onAssistantTurn
         systemPrompt: buildSystemPrompt(buildContext()),
         onDelta: (d) => {
           buffer += d;
-          setTurns((t) =>
+          setTurnsState((t) =>
             t.map((x) => (x.id === assistantId ? { ...x, content: x.content + d } : x)),
           );
         },
         onDone: () => {
-          setTurns((t) =>
+          setTurnsState((t) =>
             t.map((x) => (x.id === assistantId ? { ...x, streaming: false } : x)),
           );
           setBusy(false);
           if (buffer.trim()) onAssistantTurn?.(buffer);
         },
         onError: (err) => {
-          setTurns((t) =>
+          setTurnsState((t) =>
             t.map((x) =>
               x.id === assistantId ? { ...x, streaming: false, error: err.message } : x,
             ),
@@ -112,7 +118,7 @@ export function useChat({ provider, apiKey, model, buildContext, onAssistantTurn
     setBusy(false);
   }, []);
 
-  const clear = useCallback(() => setTurns([]), []);
+  const clear = useCallback(() => setTurnsState([]), []);
 
-  return { turns, busy, send, cancel, clear };
+  return { turns, busy, send, cancel, clear, setTurns };
 }

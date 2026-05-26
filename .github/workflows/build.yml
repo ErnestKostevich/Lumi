@@ -33,8 +33,10 @@ jobs:
         include:
           - platform: windows-latest
             args: ""
+          # macos-latest runner is arm64 (M1) since 2024 — build native, skip
+          # universal target which often flakes on first-time projects.
           - platform: macos-latest
-            args: "--target universal-apple-darwin"
+            args: ""
           - platform: ubuntu-latest
             args: ""
     runs-on: ${{ matrix.platform }}
@@ -57,8 +59,6 @@ jobs:
           node-version: 22
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -116,6 +116,7 @@ jobs:
             dist/**/*.msi
             dist/**/*.exe
             dist/**/*.dmg
+            dist/**/*.app.tar.gz
             dist/**/*.AppImage
             dist/**/*.deb
           body: |

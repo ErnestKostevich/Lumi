@@ -12,6 +12,7 @@ interface TTSHandle {
   setVoiceId: (id: string) => void;
   speak: (text: string) => void;
   supported: boolean;
+  backend?: "web" | "eleven";
 }
 
 interface Props {
@@ -45,8 +46,15 @@ export function SettingsModal({ open, onClose, settings, onChange, tts, onShowPo
     const url = checkoutUrl("pro");
     try {
       await openUrl(url);
-    } catch {
-      window.open(url, "_blank");
+    } catch (err) {
+      console.warn("[Upgrade] openUrl failed, trying window.open", err);
+      try {
+        window.open(url, "_blank");
+      } catch (err2) {
+        // Both failed — show the URL inline so user can copy it manually.
+        // eslint-disable-next-line no-alert
+        prompt("Open this URL in your browser to upgrade:", url);
+      }
     }
   };
 
@@ -225,6 +233,68 @@ export function SettingsModal({ open, onClose, settings, onChange, tts, onShowPo
             </div>
           </label>
         ) : null}
+
+        {/* ============ ElevenLabs Pro voice ============ */}
+        <div className="settings-section">
+          <span className="settings-section-title">✨ Pro voice — ElevenLabs</span>
+          <label className="settings-row">
+            <span className="settings-label">
+              ElevenLabs API key{" "}
+              <a
+                href="https://elevenlabs.io/app/settings/api-keys"
+                target="_blank"
+                rel="noreferrer"
+                className="settings-link"
+              >
+                (get one)
+              </a>
+            </span>
+            <input
+              className="settings-input"
+              type="password"
+              value={settings.elevenLabsKey}
+              onChange={(e) => onChange({ elevenLabsKey: e.target.value })}
+              placeholder="sk_... (leave empty to use OS voices)"
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+            />
+          </label>
+          {settings.elevenLabsKey ? (
+            <label className="settings-row">
+              <span className="settings-label">ElevenLabs voice</span>
+              <input
+                className="settings-input"
+                value={settings.elevenLabsVoiceId}
+                onChange={(e) => onChange({ elevenLabsVoiceId: e.target.value })}
+                placeholder="Voice ID — find in elevenlabs.io VoiceLab"
+                list="eleven-presets"
+              />
+              <datalist id="eleven-presets">
+                {ELEVEN_VOICE_PRESETS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}{p.note ? ` — ${p.note}` : ""}
+                  </option>
+                ))}
+              </datalist>
+              <span className="settings-hint">
+                Active backend: {tts?.backend === "eleven" ? "ElevenLabs (Pro)" : "Web Speech"}
+              </span>
+            </label>
+          ) : null}
+        </div>
+
+        {/* ============ Behaviour ============ */}
+        <label className="settings-row settings-row-inline">
+          <input
+            type="checkbox"
+            checked={settings.hideOnFullscreen}
+            onChange={(e) => onChange({ hideOnFullscreen: e.target.checked })}
+          />
+          <span className="settings-label settings-label-inline">
+            Hide when another app is fullscreen (games, video)
+          </span>
+        </label>
 
         {/* ============ License ============ */}
         <label className="settings-row">
