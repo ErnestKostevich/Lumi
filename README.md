@@ -1,111 +1,182 @@
-# Lumi — Anime AI Study Buddy
+<div align="center">
 
-> A SFW kawaii AI character that lives on your desktop and keeps you focused.
+# Lumi 🌸
 
-Open-source desktop app (Tauri 2 + React + TypeScript + three.js) that combines a 3D VRM anime avatar, AI chat (OpenRouter — Claude / GPT / Gemini), TTS with lip-sync, and a Pomodoro coach. Targets Windows, macOS, Linux. Strictly SFW productivity coach — **not** a romance / girlfriend app.
+**Your anime study buddy. A 3D kawaii AI character who lives on your desktop, runs your Pomodoros, and nags you when you slip into YouTube.**
 
-**Version:** 0.0.1 (pre-MVP)
+[![release](https://img.shields.io/github/v/release/ErnestKostevich/Project-0?include_prereleases&color=ff6789&label=release)](https://github.com/ErnestKostevich/Project-0/releases/latest)
+[![license](https://img.shields.io/badge/license-MIT--like-ff6789)](#license)
+[![tests](https://img.shields.io/badge/tests-22%2F22%20passing-22c55e)](#tests)
+[![platforms](https://img.shields.io/badge/platforms-Win%20%C2%B7%20macOS%20%C2%B7%20Linux-ff6789)](#download)
+
+[**Live site →**](https://lumi-bloom0.vercel.app) · [**Latest release →**](https://github.com/ErnestKostevich/Project-0/releases/latest) · [**Issues →**](https://github.com/ErnestKostevich/Project-0/issues)
+
+</div>
+
+---
+
+## Download
+
+| Platform | File | Size | Notes |
+|---|---|---|---|
+| 🪟 Windows | [`Lumi_0.0.1_x64-setup.exe`](https://github.com/ErnestKostevich/Project-0/releases/latest) | 17 MB | NSIS installer (recommended) |
+| 🪟 Windows | [`Lumi_0.0.1_x64_en-US.msi`](https://github.com/ErnestKostevich/Project-0/releases/latest) | 18 MB | MSI (IT / Group Policy) |
+| 🍎 macOS | [`Lumi_0.0.1_aarch64.dmg`](https://github.com/ErnestKostevich/Project-0/releases/latest) | 18 MB | Apple Silicon (M1/M2/M3) |
+| 🐧 Linux | [`Lumi_0.0.1_amd64.AppImage`](https://github.com/ErnestKostevich/Project-0/releases/latest) | 90 MB | Portable |
+| 🐧 Linux | [`Lumi_0.0.1_amd64.deb`](https://github.com/ErnestKostevich/Project-0/releases/latest) | 19 MB | Debian / Ubuntu |
+
+> **First-run warnings** (no code-signing on alpha):
+> - **Windows**: SmartScreen says "unrecognized publisher" → click **More info** → **Run anyway**
+> - **macOS**: Right-click `.dmg` → **Open**. After install: System Settings → Privacy & Security → **Open Anyway**
+> - **Linux**: `chmod +x Lumi_*.AppImage && ./Lumi_*.AppImage`
+>
+> Steam release in Q3 will solve signing — Valve auto-signs.
+
+---
+
+## What it does
+
+Lumi is **not** a romance app. Not a girlfriend simulator. She's a productivity coach who happens to look kawaii.
+
+- **3D anime character** lives in a transparent always-on-top window. Breathes, blinks, follows your cursor, waves at you, occasionally stretches.
+- **AI chat** via OpenRouter (Claude / GPT / Gemini / Mistral) or native Mistral. Bring your own API key — free forever.
+- **4 personality modes** — friendly senpai · sassy · cheerleader · formal. Pick your flavour of nag.
+- **Pomodoro 25/5** with mood-aware character reactions.
+- **Active-window awareness** — Lumi notices when you've been on YouTube/TikTok for 5+ min and calls you out. Privacy-safe: she only sees the *title* (same data as Task Manager), never pixels.
+- **Voice + lip-sync** — Web Speech (free, your OS voices) or ElevenLabs Flash v2.5 (Pro tier).
+- **Snap-to-edge** when you drag her near a monitor edge.
+- **Hides on fullscreen** game / video.
+- **Click on her** → expression reaction + voice line.
+
+## Privacy
+
+- **100% local.** No telemetry. No analytics. No server (beyond optional license validation).
+- Your API key never leaves your machine.
+- Active-window detection sees the window **title only**, never pixel content or screenshots.
+- Chat history persists in `localStorage` on your device.
+- Pro license validation is the only network call beyond your LLM provider.
+
+## Pricing
+
+| Tier | Price | What you get |
+|---|---|---|
+| **Free** | $0 forever | Everything above + BYO API key + OS voices |
+| **Pro** | $7 / month | ElevenLabs anime voice with real lip-sync, unlimited chat without API key, future cloud sync, all character DLC |
+| **Character DLC** | $5–15 each | Hand-crafted character packs with custom voice, outfits, idle motions (post-launch) |
+
+Pay with crypto via [NOWPayments](https://nowpayments.io/). No card needed, no recurring auto-charge — you'll get a renewal email each month.
+
+---
 
 ## Stack
 
-- **Desktop shell**: Tauri 2 (Rust), transparent always-on-top frameless window
-- **Frontend**: React 19 + TypeScript 5 + Vite 7
-- **Character**: VRM 3D via `@pixiv/three-vrm` (default: CC0 Sendagaya_Shino model from madjin/vrm-samples; drop your own `.vrm` at `public/vrm/character.vrm` to override)
-- **AI**: OpenRouter streaming chat completions, BYO-key (Claude 3.5 Sonnet default, GPT-4o-mini / Gemini Flash / Haiku selectable)
-- **Voice**: Web Speech API (free tier), ElevenLabs Flash v2.5 planned for Pro
-- **Storage**: localStorage (v0.0.1), SQLite via sqlx planned
-- **Monetization**: NOWPayments (crypto checkout via static Payment Links, optional Cloudflare Worker for IPN → email license)
-- **Tests**: Vitest + Testing Library + happy-dom
-- **CI**: GitHub Actions matrix (Windows / macOS / Linux)
-- **Distribution**: Direct download from landing page first, Steam in Q3
+| Layer | Choice |
+|---|---|
+| Desktop shell | **Tauri 2** (Rust) — transparent always-on-top frameless window, ~17 MB installer |
+| Frontend | **React 19** · TypeScript 5 · Vite 7 |
+| Character render | **three.js** + **@pixiv/three-vrm** (VRM 3D — VRoid Hub compatible) |
+| AI | **OpenRouter** (Claude / GPT / Gemini / Mistral) or native Mistral La Plateforme |
+| Voice | **Web Speech API** (free) or **ElevenLabs Flash v2.5** (Pro) |
+| Active-window | `active-win-pos-rs` crate (Win / macOS / Linux) |
+| Fullscreen detect | `windows-sys` direct Win32 calls on Windows |
+| Storage | `localStorage` (SQLite deferred to v0.1.0 — current `sqlx` ecosystem has a broken `windows-future` transitive dep) |
+| Payments | **NOWPayments** (crypto invoice) + Vercel Edge Function webhook + HMAC-SHA256 signed licenses |
+| Email | **Resend** (license delivery) |
+| KV store | **Upstash Redis** (payment records, license lookup) |
+| Hosting | **Vercel** (landing + API) |
+| CI/CD | GitHub Actions matrix → 3 OS in parallel → softprops/action-gh-release |
+| Tests | **Vitest 4** + Testing Library + happy-dom (22/22 passing) |
 
-## Develop on Windows
+## Project layout
 
-Prereqs:
-- Node 20+, pnpm 9+
-- Rust stable (`rustup default stable`)
-- Visual Studio Build Tools 2022 with the "Desktop development with C++" workload
+```
+src/                      React + TS frontend
+  components/             Character, ChatPanel, SettingsModal, SpeechBubble,
+                          PomodoroBar / Info, AuraGlow, ParticleField, CharacterScene,
+                          FallbackCharacter, Logo, VRMCharacter, icons/
+  hooks/                  useChat, usePomodoro, useSettings, useTTS,
+                          useActiveWindow, useSnapToEdge, useHideOnFullscreen
+  lib/                    llm.ts (providers), personality.ts (system prompt),
+                          elevenlabs.ts (TTS Pro), config.ts (payments),
+                          db.ts (chat history)
+src-tauri/                Rust + Tauri config
+  src/                    main.rs, lib.rs (commands: get_active_window, is_foreground_fullscreen)
+  capabilities/           window + opener permissions
+  tauri.conf.json         360x540 transparent always-on-top frameless
+landing/                  Standalone marketing site (HTML/CSS + Vercel Edge Functions)
+  index.html              Hero with live 3D VRM, features, pricing, FAQ, download
+  api/                    /checkout /webhook /verify-license /health
+  lib/                    nowpayments, license, email, kv
+public/vrm/               Bundled VRM models (sample.vrm = Sendagaya_Shino CC0)
+.github/workflows/        CI: matrix build for 3 OS + single publish job
+memory/                   Project context (Claude Code sessions)
+```
 
-> If your `C:\` is full, point Rust to another drive:
-> ```
-> setx RUSTUP_HOME "D:\rust\rustup"
-> setx CARGO_HOME "D:\rust\cargo"
-> ```
-> restart your shell, then `rustup default stable`.
+## Develop
 
-Run:
+### Prereqs
+
+- **Node 22+** and **pnpm 11+**
+- **Rust stable** (`rustup default stable`)
+- **Windows**: Visual Studio Build Tools 2022 with "Desktop development with C++"
+- **macOS**: Xcode CLT (`xcode-select --install`)
+- **Linux**: `sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf`
+
+### Run
 
 ```bash
 pnpm install
 pnpm tauri dev           # desktop app
 pnpm landing             # marketing page on http://localhost:4173
-pnpm test                # unit tests (CI runs on push)
+pnpm test                # unit tests (22/22)
 ```
 
-## Develop on macOS / Linux
-
-```bash
-# macOS
-xcode-select --install
-brew install rust pnpm
-
-# Linux (Debian / Ubuntu)
-sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# then on either:
-pnpm install
-pnpm tauri dev
-```
-
-## Build production binaries
+### Build production binaries
 
 ```bash
 pnpm tauri build
-# outputs: src-tauri/target/release/bundle/
-#   Windows: *.msi + *.exe
-#   macOS:   *.dmg + *.app
-#   Linux:   *.AppImage + *.deb
+# → src-tauri/target/release/bundle/
+#   Windows: msi/*.msi  nsis/*-setup.exe
+#   macOS:   dmg/*.dmg
+#   Linux:   appimage/*.AppImage  deb/*.deb
 ```
 
-GitHub Actions auto-builds for all three platforms on push to `main` and on `v*` tags. Artifacts are downloadable from the workflow run.
+GitHub Actions auto-builds for all 3 platforms on `v*` tag push, then `publish` job aggregates into a single Release with installers attached.
 
-## Project layout
+## Customise your character
 
-```
-src/                       React + TS frontend
-  components/              Character, VRMCharacter, FallbackCharacter, ChatPanel, SettingsModal, PomodoroBar, PomodoroInfoModal, SpeechBubble, AuraGlow, ParticleField, CharacterScene, Logo, icons/
-  hooks/                   useChat, usePomodoro, useSettings, useTTS  (+ __tests__)
-  lib/                     llm.ts, personality.ts, config.ts          (+ __tests__)
-src-tauri/                 Rust + Tauri config
-  src/                     main.rs, lib.rs
-  capabilities/            default.json (window permissions)
-  tauri.conf.json          window setup, bundle config
-landing/                   Standalone marketing site (HTML / CSS / vanilla JS + three.js via CDN)
-  serve.mjs                Tiny Node static server (works around pnpm + Node 24 quirks)
-public/vrm/                Bundled VRM models (sample.vrm = Shino, optional character.vrm = user override)
-public/live2d/             Legacy Live2D files (kept for future Cubism support)
-scripts/                   dev.bat / dev.ps1 helpers
-memory/                    Project context for Claude Code sessions
-.github/workflows/         CI: build matrix for win/mac/linux
-```
+Drop any VRM file at `public/vrm/character.vrm` and Lumi will load it instead of the bundled Sendagaya Shino. Free anime VRMs from:
 
-## Monetization (NOWPayments)
+- [VRoid Hub](https://hub.vroid.com/en) (filter by "Commercial use OK")
+- [VRoid Studio](https://vroid.com/en/studio) (build your own in ~30 min)
+- [Open Source Avatars](https://www.opensourceavatars.com/en) (300+ CC0)
 
-The app and landing page expect two NOWPayments Payment Links (one for the $7/mo Pro plan, one for the character DLC store). Set them up in [the NOWPayments dashboard](https://account.nowpayments.io/dashboard) under **Payment Links → Create**.
+## Roadmap
 
-Replace placeholders in:
-- `src/lib/config.ts` → `NOWPAYMENTS.proInvoiceId` and `NOWPAYMENTS.dlcInvoiceId`
-- `landing/index.html` → two `<a data-checkout="...">` hrefs
+- macOS x86_64 + Linux ARM builds (currently arm64 Mac / amd64 Linux only)
+- Custom commissioned VRM character DLC store ($5–15 each)
+- Cloud chat history sync (Pro)
+- Steam release Q3 — solves SmartScreen + Gatekeeper warnings, brings auto-updates
+- SQLite chat persistence via `rusqlite` (replaces `localStorage` once `sqlx` ecosystem stabilises)
+- Vision (Pro+, opt-in) — Lumi can see your screen for code review / writing help
+- iOS / Android (maybe — VRM on mobile is tricky)
 
-For license-key delivery you'll need a tiny webhook server. Recommended: Cloudflare Worker that verifies the `x-nowpayments-sig` HMAC-SHA512 and emails a signed license via Resend. ~30 lines, $0/mo on free tier.
+## Acknowledgements
 
-## Privacy
-
-- API keys live in `localStorage` on the user's machine only.
-- No telemetry, no analytics, no remote server (until license validation ships).
-- Audio (Web Speech) and rendering happen entirely on-device.
+- **Sendagaya_Shino.vrm** — CC0 model from [madjin/vrm-samples](https://github.com/madjin/vrm-samples) by VRoid
+- **@pixiv/three-vrm** — Pixiv's official VRM loader for three.js
+- **active-win-pos-rs** — cross-platform foreground window detection
+- **Tauri**, **softprops/action-gh-release**, **NOWPayments**, **Resend**, **Upstash**, **Vercel**
+- One-person indie dev project — feedback / bug reports welcome in [Issues](https://github.com/ErnestKostevich/Project-0/issues)
 
 ## License
 
-TBD before public release. Binary is closed-source; selected source files may be open-sourced post-launch.
+The source code in this repo is provided for transparency and feedback. The **binary distribution** (downloads from [Releases](https://github.com/ErnestKostevich/Project-0/releases)) and the **trademark "Lumi"** are owned by the project. Commercial use, redistribution, and forking-as-competitor are not granted by default — open an issue if you have a use case.
+
+Bundled assets (VRM character, Live2D Hiyori samples, Cubism Core) retain their original licenses (CC0 / Cubism SDK Release License). Source files are MIT-style for educational reading.
+
+---
+
+<div align="center">
+<sub>Made with 🌸 by one indie dev. If Lumi makes your day better, <a href="https://lumi-bloom0.vercel.app/#pricing">support the project</a>.</sub>
+</div>
