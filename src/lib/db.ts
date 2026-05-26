@@ -1,72 +1,83 @@
 /**
- * SQLite chat history persistence via tauri-plugin-sql.
- * Migrations applied automatically on startup (see src-tauri/src/lib.rs).
+ * Chat history persistence — localStorage backed (v0.0.1).
  *
- * Schema:
- *   messages(id, role, content, ts)        — chat turns
- *   pomodoro_sessions(id, phase, started_at, finished_at) — for stats later
+ * Why localStorage and not SQLite: tauri-plugin-sql in May 2026 pulls a
+ * broken windows-future transitive dep that fails to compile on all 3
+ * platforms (~150 errors). localStorage is enough for ~thousands of messages
+ * and survives app restart on the same machine.
+ *
+ * Cross-device sync + analytics-quality history come in v0.1.0 via either
+ * rusqlite (no async deps) or a hosted DB tied to the Pro license.
  */
 
-import Database from "@tauri-apps/plugin-sql";
 import type { ChatTurn } from "../hooks/useChat";
 
-let dbPromise: Promise<Database> | null = null;
+const KEY = "lumi:chat:v1";
+const MAX_TURNS = 200;
 
-function db(): Promise<Database> {
-  if (!dbPromise) {
-    dbPromise = Database.load("sqlite:lumi.db");
-  }
-  return dbPromise;
-}
-
-interface Row {
-  id: number;
+interface PersistedTurn {
+  id: string;
   role: "user" | "assistant";
   content: string;
   ts: number;
 }
 
-/** Load the most recent N messages as ChatTurn[], oldest-first for UI. */
-export async function loadRecentMessages(limit = 40): Promise<ChatTurn[]> {
+function read(): PersistedTurn[] {
+  if (typeof localStorage === "undefined") return [];
   try {
-    const conn = await db();
-    const rows = (await conn.select<Row[]>(
-      "SELECT id, role, content, ts FROM messages ORDER BY id DESC LIMIT $1",
-      [limit],
-    )) ?? [];
-    return rows
-      .reverse()
-      .map((r) => ({
-        id: String(r.id),
-        role: r.role,
-        content: r.content,
-      }));
-  } catch (err) {
-    console.warn("[db] loadRecentMessages:", err);
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
     return [];
   }
 }
 
+function write(turns: PersistedTurn[]): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    // Trim — keep most recent MAX_TURNS, drop older.
+    const trimmed = turns.length > MAX_TURNS ? turns.slice(-MAX_TURNS) : turns;
+    localStorage.setItem(KEY, JSON.stringify(trimmed));
+  } catch (err) {
+    // Quota exceeded or storage disabled — log and continue.
+    console.warn("[db] localStorage write failed:", err);
+  }
+}
+
+/** Load the most recent N messages as ChatTurn[], oldest-first for UI. */
+export async function loadRecentMessages(limit = 40): Promise<ChatTurn[]> {
+  const all = read();
+  return all.slice(-limit).map((r) => ({
+    id: r.id,
+    role: r.role,
+    content: r.content,
+  }));
+}
+
 /** Append a single message to history. Fire-and-forget. */
 export async function appendMessage(role: "user" | "assistant", content: string): Promise<void> {
-  try {
-    const conn = await db();
-    await conn.execute(
-      "INSERT INTO messages (role, content, ts) VALUES ($1, $2, $3)",
-      [role, content, Date.now()],
-    );
-  } catch (err) {
-    console.warn("[db] appendMessage:", err);
-  }
+  const all = read();
+  all.push({
+    id:
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    role,
+    content,
+    ts: Date.now(),
+  });
+  write(all);
 }
 
 /** Wipe chat history. Called from the Clear button in ChatPanel. */
 export async function clearMessages(): Promise<void> {
+  if (typeof localStorage === "undefined") return;
   try {
-    const conn = await db();
-    await conn.execute("DELETE FROM messages");
-  } catch (err) {
-    console.warn("[db] clearMessages:", err);
+    localStorage.removeItem(KEY);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -76,12 +87,17 @@ export async function recordPomodoroSession(
   startedAt: number,
   finishedAt: number,
 ): Promise<void> {
+  if (typeof localStorage === "undefined") return;
+  const STATS_KEY = "lumi:pomodoros:v1";
   try {
-    const conn = await db();
-    await conn.execute(
-      "INSERT INTO pomodoro_sessions (phase, started_at, finished_at) VALUES ($1, $2, $3)",
-      [phase, startedAt, finishedAt],
-    );
+    const raw = localStorage.getItem(STATS_KEY);
+    const arr: Array<{ phase: string; startedAt: number; finishedAt: number }> = raw
+      ? JSON.parse(raw)
+      : [];
+    arr.push({ phase, startedAt, finishedAt });
+    // Keep last 500 sessions.
+    const trimmed = arr.length > 500 ? arr.slice(-500) : arr;
+    localStorage.setItem(STATS_KEY, JSON.stringify(trimmed));
   } catch (err) {
     console.warn("[db] recordPomodoroSession:", err);
   }

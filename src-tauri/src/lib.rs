@@ -24,14 +24,16 @@ fn get_active_window() -> Option<ActiveWindowInfo> {
 #[cfg(windows)]
 #[tauri::command]
 fn is_foreground_fullscreen() -> bool {
-    use windows_sys::Win32::Foundation::{HWND, RECT};
-    use windows_sys::Win32::Graphics::Gdi::{MonitorFromWindow, GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO};
+    use windows_sys::Win32::Foundation::RECT;
+    use windows_sys::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetForegroundWindow, GetWindowRect, GetDesktopWindow, GetShellWindow,
+        GetDesktopWindow, GetForegroundWindow, GetShellWindow, GetWindowRect,
     };
     unsafe {
-        let hwnd: HWND = GetForegroundWindow();
-        if hwnd == 0 || hwnd == GetDesktopWindow() || hwnd == GetShellWindow() {
+        let hwnd = GetForegroundWindow();
+        if hwnd.is_null() || hwnd == GetDesktopWindow() || hwnd == GetShellWindow() {
             return false;
         }
         let mut wnd_rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
@@ -39,7 +41,7 @@ fn is_foreground_fullscreen() -> bool {
             return false;
         }
         let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-        if monitor == 0 {
+        if monitor.is_null() {
             return false;
         }
         let mut info: MONITORINFO = std::mem::zeroed();
@@ -72,40 +74,8 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    use tauri_plugin_sql::{Migration, MigrationKind};
-
-    let migrations = vec![
-        Migration {
-            version: 1,
-            description: "create chat history",
-            sql: "CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                ts INTEGER NOT NULL
-            ); CREATE INDEX IF NOT EXISTS idx_messages_ts ON messages(ts);",
-            kind: MigrationKind::Up,
-        },
-        Migration {
-            version: 2,
-            description: "pomodoro stats",
-            sql: "CREATE TABLE IF NOT EXISTS pomodoro_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                phase TEXT NOT NULL,
-                started_at INTEGER NOT NULL,
-                finished_at INTEGER
-            );",
-            kind: MigrationKind::Up,
-        },
-    ];
-
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(
-            tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:lumi.db", migrations)
-                .build(),
-        )
         .invoke_handler(tauri::generate_handler![
             greet,
             get_active_window,

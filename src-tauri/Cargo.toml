@@ -25,8 +25,10 @@ serde_json = "1"
 # Cross-platform foreground window detection (Win/macOS/Linux).
 # macOS users must grant Accessibility permission once; Linux requires X11.
 active-win-pos-rs = "0.9"
-# Local SQLite for chat history persistence.
-tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+# NOTE: tauri-plugin-sql removed in v0.0.1 — it pulled a broken windows-future
+# dependency (148 compile errors). Chat history persists via localStorage.
+# Will revisit SQLite in v0.1.0 once sqlx ecosystem stabilises, or switch to
+# rusqlite (no async deps).
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
