@@ -228,7 +228,8 @@ function App() {
         <div className="character-anchor">
           <AuraGlow mood={mood} />
           <Character
-            size={300}
+            width={300}
+            height={400}
             mouthAmplitude={mouthAmp}
             reactionTrigger={reactionTick}
             mood={mood}
@@ -336,24 +337,33 @@ function clickReactionsFor(mode: string): string[] {
         "Yes, I'm right here. Eyes on the screen.",
         "Don't poke me — poke your todo list.",
         "Cute, but unproductive.",
+        "Hehe — caught you slacking again~",
+        "Mhm? Distracted already?",
       ];
     case "cheerleader":
       return [
         "Hi hi! Ready to crush it? ✨",
         "You came back! Let's go! 🌸",
         "I see you! Round two? 💪",
+        "Yay~ hi friend! ✿",
+        "There you are! Let's gooo ⭐",
       ];
     case "formal":
       return [
         "How can I help you focus?",
         "Ready when you are.",
         "Shall we begin a Pomodoro?",
+        "Yes? I am here.",
       ];
     default:
       return [
         "Hi! Need anything? 🌸",
         "Hey, you got this ✨",
         "Tap again if you wanna chat!",
+        "Ehehe~ that tickles 🌸",
+        "Awww, hi there~",
+        "Mm? Cheering you on ✿",
+        "You poked me~ tehee",
       ];
   }
 }

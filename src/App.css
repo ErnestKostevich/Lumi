@@ -269,8 +269,9 @@ input, textarea, select {
 .stage {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
+  padding-bottom: 64px;
   position: relative;
   background: transparent;
   z-index: 5;
@@ -333,8 +334,8 @@ input, textarea, select {
 
 .character-anchor {
   position: relative;
-  width: 280px;
-  height: 280px;
+  width: 300px;
+  height: 400px;
   display: flex;
   align-items: flex-end;
   justify-content: center;

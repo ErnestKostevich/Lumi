@@ -3,7 +3,12 @@ import { VRMCharacter, type Mood } from "./VRMCharacter";
 import { FallbackCharacter } from "./FallbackCharacter";
 
 interface CharacterProps {
+  /** Legacy square size — sets both width and height. */
   size?: number;
+  /** Override width independently (portrait canvases). */
+  width?: number;
+  /** Override height independently (portrait canvases). */
+  height?: number;
   /** 0..1 mouth-open amount, driven by the TTS hook. */
   mouthAmplitude?: number;
   /** Bumps to trigger reaction expression. */
@@ -23,22 +28,27 @@ interface CharacterProps {
  */
 export function Character({
   size = 280,
+  width,
+  height,
   mouthAmplitude = 0,
   reactionTrigger = 0,
   mood = "idle",
   onClick,
 }: CharacterProps) {
   const [errored, setErrored] = useState(false);
+  const w = width ?? size;
+  const h = height ?? size;
 
   return (
     <div
       className="character-wrap"
-      style={{ width: size, height: size, position: "relative" }}
+      style={{ width: w, height: h, position: "relative" }}
       onClick={!errored ? undefined : onClick}
     >
       {!errored ? (
         <VRMCharacter
-          size={size}
+          width={w}
+          height={h}
           mouthAmplitude={mouthAmplitude}
           reactionTrigger={reactionTrigger}
           mood={mood}
@@ -46,7 +56,7 @@ export function Character({
           onError={() => setErrored(true)}
         />
       ) : (
-        <FallbackCharacter size={size} />
+        <FallbackCharacter size={Math.min(w, h)} />
       )}
     </div>
   );

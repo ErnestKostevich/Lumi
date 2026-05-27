@@ -339,9 +339,9 @@
         scene.add(fill);
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
-        const camera = new THREE.PerspectiveCamera(28, W / H, 0.05, 20);
-        camera.position.set(0, 1.4, 0.8);
-        camera.lookAt(0, 1.4, 0);
+        const camera = new THREE.PerspectiveCamera(26, W / H, 0.05, 20);
+        camera.position.set(0, 0.9, 2);
+        camera.lookAt(0, 0.9, 0);
 
         const lookTarget = new THREE.Object3D();
         scene.add(lookTarget);
@@ -349,7 +349,11 @@
         const clock = new THREE.Clock();
         let vrm = null;
         let blinkUntil = 0;
+        let winkUntil = 0;
+        let winkSide = "left";
         let nextBlinkAt = performance.now() + 3000;
+        let hipsBone = null, spineBone = null, leftLegBone = null, rightLegBone = null;
+        let frameCenter = { x: 0, y: 1.4, z: 0 };
 
         const loader = new GLTFLoader();
         loader.register((parser) => new VRMLoaderPlugin(parser));
@@ -404,36 +408,50 @@
             vrm = m;
 
             const head = m.humanoid?.getRawBoneNode("head");
-            const chest =
-              m.humanoid?.getRawBoneNode("chest") ||
-              m.humanoid?.getRawBoneNode("upperChest") ||
-              m.humanoid?.getRawBoneNode("spine");
+            hipsBone = m.humanoid?.getRawBoneNode("hips");
+            spineBone = m.humanoid?.getRawBoneNode("spine");
+            leftLegBone = m.humanoid?.getRawBoneNode("leftUpperLeg");
+            rightLegBone = m.humanoid?.getRawBoneNode("rightUpperLeg");
+            const lToe = m.humanoid?.getRawBoneNode("leftToes") || m.humanoid?.getRawBoneNode("leftFoot");
+            const rToe = m.humanoid?.getRawBoneNode("rightToes") || m.humanoid?.getRawBoneNode("rightFoot");
 
-            const frameWidth = 0.55;
-            let frameTopY = 1.6, frameBottomY = 1.2;
-            let cx = 0, cz = 0;
+            // ---- FULL BODY framing (head crown → soles) ----
+            const fullBox = new THREE.Box3().setFromObject(m.scene);
+            const frameWidth = 0.75;
+            let frameTopY = fullBox.max.y + 0.08;
+            let cx = 0, cz = 0, headY = 1.4;
             if (head) {
               const hp = head.getWorldPosition(new THREE.Vector3());
               cx = hp.x;
               cz = hp.z;
+              headY = hp.y;
               frameTopY = hp.y + 0.18;
-              if (chest) {
-                const cp = chest.getWorldPosition(new THREE.Vector3());
-                frameBottomY = cp.y - 0.4;
-              } else {
-                frameBottomY = hp.y - 0.7;
-              }
             }
+            const footY =
+              lToe && rToe
+                ? Math.min(
+                    lToe.getWorldPosition(new THREE.Vector3()).y,
+                    rToe.getWorldPosition(new THREE.Vector3()).y,
+                  )
+                : lToe
+                  ? lToe.getWorldPosition(new THREE.Vector3()).y
+                  : rToe
+                    ? rToe.getWorldPosition(new THREE.Vector3()).y
+                    : fullBox.min.y;
+            const frameBottomY = footY - 0.04;
             const frameH = Math.max(0.001, frameTopY - frameBottomY);
             const cy = (frameTopY + frameBottomY) / 2;
-            const fovRad = (camera.fov * Math.PI) / 180;
-            const dH = (frameH / 2 / Math.tan(fovRad / 2)) * 1.25;
-            const dW = (frameWidth / 2 / Math.tan(fovRad / 2)) * 1.1;
+            const aspect = W / H;
+            const fovRadV = (camera.fov * Math.PI) / 180;
+            const fovRadH = 2 * Math.atan(Math.tan(fovRadV / 2) * aspect);
+            const dH = (frameH / 2 / Math.tan(fovRadV / 2)) * 1.06;
+            const dW = (frameWidth / 2 / Math.tan(fovRadH / 2)) * 1.06;
             const distance = Math.max(dH, dW);
 
             camera.position.set(cx, cy, cz + distance);
             camera.lookAt(cx, cy, cz);
-            lookTarget.position.set(cx, cy + 0.1, cz + 1);
+            lookTarget.position.set(cx, headY, cz + 1);
+            frameCenter = { x: cx, y: headY, z: cz };
             if (m.lookAt) m.lookAt.target = lookTarget;
 
             if (loadingLabel) loadingLabel.style.opacity = "0";
@@ -454,6 +472,9 @@
           lookTarget.position.copy(v);
         });
 
+        const trySetExpr = (e, name, val) => {
+          try { e.setValue(name, val); } catch {}
+        };
         const tick = () => {
           const t = performance.now();
           const dt = clock.getDelta();
@@ -465,19 +486,48 @@
             tickRestPose();
             const e = vrm.expressionManager;
             if (e) {
-              if (t < blinkUntil) e.setValue("blink", 1);
-              else {
-                e.setValue("blink", 0);
+              // Wink active?
+              if (t < winkUntil) {
+                const n = winkSide === "left" ? ["blinkLeft", "blink_l"] : ["blinkRight", "blink_r"];
+                for (const nm of n) trySetExpr(e, nm, 1);
+                trySetExpr(e, "blink", 0);
+              } else if (t < blinkUntil) {
+                trySetExpr(e, "blink", 1);
+                trySetExpr(e, "blinkLeft", 0); trySetExpr(e, "blinkRight", 0);
+                trySetExpr(e, "blink_l", 0); trySetExpr(e, "blink_r", 0);
+              } else {
+                trySetExpr(e, "blink", 0);
+                trySetExpr(e, "blinkLeft", 0); trySetExpr(e, "blinkRight", 0);
+                trySetExpr(e, "blink_l", 0); trySetExpr(e, "blink_r", 0);
                 if (t > nextBlinkAt) {
-                  blinkUntil = t + 130;
+                  // 22% chance: cute wink instead of blink
+                  if (Math.random() < 0.22) {
+                    winkUntil = t + 260;
+                    winkSide = Math.random() < 0.5 ? "left" : "right";
+                  } else {
+                    blinkUntil = t + 130;
+                  }
                   nextBlinkAt = t + 2800 + Math.random() * 2800;
                 }
               }
+              // Soft baseline smile so the resting face isn't blank
+              trySetExpr(e, "happy", 0.18);
             }
             const phase = t / 1000;
             vrm.scene.position.y = Math.sin(phase * 1.6) * 0.005;
             // Keep the forced 180° baseline, add gentle sway
             vrm.scene.rotation.y = Math.PI + Math.sin(phase * 0.45) * 0.06;
+
+            // Hip sway / weight shift — slow 7s cycle
+            const hipPhase = phase * 0.45;
+            const hipSway = Math.sin(hipPhase) * 0.06;
+            if (hipsBone) {
+              hipsBone.rotation.y = hipSway;
+              hipsBone.position.x = Math.sin(hipPhase) * 0.015;
+            }
+            if (spineBone) spineBone.rotation.y = -hipSway * 0.5;
+            if (leftLegBone) leftLegBone.rotation.y = -hipSway * 0.3;
+            if (rightLegBone) rightLegBone.rotation.y = -hipSway * 0.3;
           }
           renderer.render(scene, camera);
           requestAnimationFrame(tick);
