@@ -108,8 +108,10 @@ export function VRMCharacter({
     /** Wink scheduling (separate from blink). */
     winkUntil: number;
     winkSide: "left" | "right";
-    /** TTS lip-sync. */
+    /** TTS lip-sync raw target (0..1). */
     mouthAmp: number;
+    /** Smoothed mouth value — lerped each frame for a less jumpy mouth. */
+    mouthSmoothed: number;
     /** Click reaction state. */
     reaction: { name: string; until: number } | null;
     /** Mood prop mirror (set by effect). */
@@ -171,6 +173,7 @@ export function VRMCharacter({
     winkUntil: 0,
     winkSide: "left",
     mouthAmp: 0,
+    mouthSmoothed: 0,
     reaction: null,
     mood: "idle",
     bones: {
@@ -513,13 +516,23 @@ export function VRMCharacter({
           // Slightly bumped to 0.18 — friendly resting face, not blank.
           trySet(vrm, "happy", 0.18);
 
-          // Lip-sync overrides baseline mouth.
-          const amp = s.mouthAmp;
-          trySet(vrm, "aa", Math.max(0, Math.min(1, amp)));
+          // Lip-sync — cap + smooth so the mouth doesn't gape wide open or
+          // snap shut between syllables. Web Speech amplitude is simulated
+          // (random walk 0.3-0.95) so smoothing is essential.
+          // Cap target at 0.45 — a half-open mouth reads as natural speech;
+          // full 1.0 looks like screaming.
+          const ampTarget = Math.max(0, Math.min(0.45, s.mouthAmp * 0.55));
+          // Asymmetric lerp: open quickly (0.35), close slower (0.18) — natural
+          // mouth dynamics.
+          const lerpK = ampTarget > s.mouthSmoothed ? 0.35 : 0.18;
+          s.mouthSmoothed += (ampTarget - s.mouthSmoothed) * lerpK;
+          trySet(vrm, "aa", s.mouthSmoothed);
 
           // Click reaction — decays smoothly over 1.4s on top of baseline.
+          // Suppressed during speech so we don't get a weird "wide smile +
+          // open mouth + head sway" combo that read as uncanny.
           const reaction = s.reaction;
-          if (reaction) {
+          if (reaction && s.mouthSmoothed < 0.05) {
             if (t < reaction.until) {
               const remaining = (reaction.until - t) / 1400;
               const eased = Math.sin(remaining * Math.PI);
@@ -528,6 +541,11 @@ export function VRMCharacter({
               trySet(vrm, reaction.name, 0.18);
               s.reaction = null;
             }
+          } else if (reaction && s.mouthSmoothed >= 0.05) {
+            // Reset reaction to baseline while speaking — clear it so it doesn't
+            // resume mid-expression when speech ends.
+            trySet(vrm, reaction.name, 0.18);
+            s.reaction = null;
           }
         }
 
@@ -540,47 +558,53 @@ export function VRMCharacter({
         const bounce = 1 + s.clickPulse * 0.04;
         vrm.scene.scale.set(bounce, bounce, bounce);
 
+        // Speech damping — when the mouth is moving (TTS active), reduce idle
+        // animation amplitude so the head isn't bobbing dramatically while
+        // she's talking. Was creepy at full sway.
+        const speechDamp = s.mouthSmoothed > 0.05 ? 0.35 : 1.0;
+
         // ---- Multi-frequency breathing + whole-body Y drift ----
         // Boosted amplitudes — old values were too subtle, character looked static.
         const breath = Math.sin(phase * 1.5) * 0.012 + Math.sin(phase * 2.3) * 0.004;
         vrm.scene.position.y = breath * moodMul;
-        // Slow Y rotation around the forced 180° baseline (visible 5° sway).
-        vrm.scene.rotation.y = Math.PI + Math.sin(phase * 0.4) * 0.09 * moodMul;
+        // Slow Y rotation around the forced 180° baseline (visible 5° sway,
+        // damped while speaking).
+        vrm.scene.rotation.y = Math.PI + Math.sin(phase * 0.4) * 0.09 * moodMul * speechDamp;
 
         // ---- Hip + spine sway (weight shift, ~7s cycle) ----
-        // Boosted to be clearly visible — ~8° hip rotation, ~3cm lateral shift.
+        // ROTATION-ONLY — touching hips.position.{x,y} breaks the VRM rig
+        // because VRMHumanoid expects bone *rotations* relative to rest, but
+        // positions are part of the skeleton at-rest layout. Setting them
+        // absolutely yanked the hips down to ~0m and chopped the legs off frame.
         const bones = s.bones;
-        const hipPhase = phase * 0.45; // slow
-        const hipSway = Math.sin(hipPhase) * 0.14 * moodMul;
-        const hipShift = Math.sin(hipPhase) * 0.03 * moodMul;
+        const hipPhase = phase * 0.45;
+        const hipSway = Math.sin(hipPhase) * 0.10 * moodMul; // softened from 0.14 → 0.10
         if (bones.hips) {
           bones.hips.rotation.y = hipSway;
-          bones.hips.position.x = hipShift;
-          // Subtle up-down bob synced to opposite-leg-planting moment
-          bones.hips.position.y = Math.abs(Math.sin(hipPhase)) * 0.006 * moodMul;
+          bones.hips.rotation.z = Math.sin(hipPhase) * 0.025 * moodMul; // soft side tilt
         }
         // Counter-rotate spine/chest so torso stays facing forward — looks natural.
         if (bones.spine) {
           bones.spine.rotation.y = -hipSway * 0.5;
-          bones.spine.rotation.z = Math.sin(hipPhase + 0.3) * 0.04 * moodMul; // soft side bend
+          bones.spine.rotation.z = Math.sin(hipPhase + 0.3) * 0.03 * moodMul;
         }
         if (bones.chest && bones.chest !== bones.spine) {
           bones.chest.rotation.y = -hipSway * 0.25;
         }
-        // Legs follow hips with visible matching twist + alternating knee bend.
+        // Legs follow hips with visible matching twist. Knee bend kept subtle.
         if (bones.leftUpperLeg) {
           bones.leftUpperLeg.rotation.y = -hipSway * 0.35;
-          bones.leftUpperLeg.rotation.x = Math.sin(hipPhase) * 0.04 * moodMul;
+          bones.leftUpperLeg.rotation.x = Math.sin(hipPhase) * 0.025 * moodMul;
         }
         if (bones.rightUpperLeg) {
           bones.rightUpperLeg.rotation.y = -hipSway * 0.35;
-          bones.rightUpperLeg.rotation.x = -Math.sin(hipPhase) * 0.04 * moodMul;
+          bones.rightUpperLeg.rotation.x = -Math.sin(hipPhase) * 0.025 * moodMul;
         }
         if (bones.leftLowerLeg) {
-          bones.leftLowerLeg.rotation.x = Math.max(0, Math.sin(hipPhase)) * 0.06 * moodMul;
+          bones.leftLowerLeg.rotation.x = Math.max(0, Math.sin(hipPhase)) * 0.04 * moodMul;
         }
         if (bones.rightLowerLeg) {
-          bones.rightLowerLeg.rotation.x = Math.max(0, -Math.sin(hipPhase)) * 0.06 * moodMul;
+          bones.rightLowerLeg.rotation.x = Math.max(0, -Math.sin(hipPhase)) * 0.04 * moodMul;
         }
 
         // ---- Idle look-around when cursor is still ----
@@ -599,14 +623,15 @@ export function VRMCharacter({
 
         // ---- Head + neck idle motion + cursor-aware tilt ----
         // Boosted: head bobs ~4° + cursor tilt ±10° (kawaii "she's looking at you").
-        const headTilt = -s.cursorDeltaX * 0.18; // -1..1 cursor → ±0.18 rad (~10°)
+        // Damped to ~35% during speech so head doesn't wobble while talking.
+        const headTilt = -s.cursorDeltaX * 0.18 * speechDamp;
         if (bones.head) {
           bones.head.rotation.z =
-            Math.sin(phase * 0.4) * 0.07 * moodMul + headTilt;
-          bones.head.rotation.x = Math.sin(phase * 0.55) * 0.04 * moodMul;
+            Math.sin(phase * 0.4) * 0.07 * moodMul * speechDamp + headTilt;
+          bones.head.rotation.x = Math.sin(phase * 0.55) * 0.04 * moodMul * speechDamp;
         }
         if (bones.neck) {
-          bones.neck.rotation.x = Math.sin(phase * 0.55) * 0.024 * moodMul;
+          bones.neck.rotation.x = Math.sin(phase * 0.55) * 0.024 * moodMul * speechDamp;
           bones.neck.rotation.z = headTilt * 0.4;
         }
 
@@ -745,11 +770,11 @@ export function VRMCharacter({
           }
         }
 
-        // ---- Micro-gestures (every 7-15s, short cute moves) ----
-        // The reason Lumi felt "static" — she had nothing happening between the
-        // 30-90s wave/peace gestures. These short overlays make her feel alive:
-        // head tilt + smile flash, hand wiggle, body lean, hair touch.
-        // Run AFTER everything else so they override for the gesture's duration.
+        // ---- Micro-gestures (every 15-30s, calm cute moves) ----
+        // Toned WAY down from the first iteration — previous values felt jumpy
+        // and "twitchy" rather than alive. New design: longer duration (1.4-2s),
+        // smaller amplitudes, less frequent (15-30s) so each move reads as
+        // intentional rather than a spasm.
         if (
           s.microStartedAt === null &&
           t > s.nextMicroAt &&
@@ -759,17 +784,17 @@ export function VRMCharacter({
         ) {
           s.microStartedAt = t;
           const types: ("headTilt" | "handWiggle" | "lean" | "hairTouch")[] = [
-            "headTilt", "headTilt", "handWiggle", "lean", "hairTouch",
+            "headTilt", "headTilt", "lean", "lean", "handWiggle", "hairTouch",
           ];
           s.microType = types[Math.floor(Math.random() * types.length)];
-          s.microDuration = 900 + Math.random() * 700;
+          s.microDuration = 1400 + Math.random() * 700; // slower in/out
           s.microSide = Math.random() < 0.5 ? 1 : -1;
         }
         if (s.microStartedAt !== null) {
           const elapsed = t - s.microStartedAt;
           if (elapsed > s.microDuration) {
             s.microStartedAt = null;
-            s.nextMicroAt = t + 7_000 + Math.random() * 8_000;
+            s.nextMicroAt = t + 15_000 + Math.random() * 15_000;
             // Reset bones that micro-gestures touched (idle sway will set fresh next frame)
             if (s.microType === "hairTouch") {
               if (bones.rightUpperArm) bones.rightUpperArm.rotation.z = bones.baseRightUpperArmZ;
@@ -784,39 +809,39 @@ export function VRMCharacter({
             const side = s.microSide;
             switch (s.microType) {
               case "headTilt":
-                // Pronounced head tilt + happy-flash for a quick cute moment
+                // Gentle head tilt + tiny smile bump
                 if (bones.head) {
                   bones.head.rotation.z =
-                    Math.sin(phase * 0.4) * 0.07 * moodMul + headTilt + arch * 0.28 * side;
+                    Math.sin(phase * 0.4) * 0.07 * moodMul + headTilt + arch * 0.14 * side;
                 }
-                trySet(vrm, "happy", 0.18 + arch * 0.32);
+                trySet(vrm, "happy", 0.18 + arch * 0.18);
                 break;
               case "handWiggle":
-                // Tiny waggle of right hand at hip level
+                // Very soft waggle of right hand at hip level
                 if (bones.rightLowerArm) {
                   bones.rightLowerArm.rotation.x =
-                    -armSwayX * 0.5 + arch * Math.sin(elapsed * 0.025) * 0.35;
+                    -armSwayX * 0.5 + arch * Math.sin(elapsed * 0.012) * 0.18;
                 }
                 break;
               case "lean":
-                // Whole-body lean to one side
+                // Gentle whole-body lean
                 if (bones.spine) {
                   bones.spine.rotation.z =
-                    Math.sin(hipPhase + 0.3) * 0.04 * moodMul + arch * 0.09 * side;
+                    Math.sin(hipPhase + 0.3) * 0.03 * moodMul + arch * 0.05 * side;
                 }
                 if (bones.chest && bones.chest !== bones.spine) {
-                  bones.chest.rotation.z = arch * 0.05 * side;
+                  bones.chest.rotation.z = arch * 0.03 * side;
                 }
                 break;
               case "hairTouch":
-                // Right arm reaches up briefly toward head — flirty hair-touch
+                // Right arm reaches up slowly — softened from 1.1 → 0.7 rad
                 if (bones.rightUpperArm) {
-                  bones.rightUpperArm.rotation.z = bones.baseRightUpperArmZ + arch * 1.1;
-                  bones.rightUpperArm.rotation.x = -arch * 0.4;
+                  bones.rightUpperArm.rotation.z = bones.baseRightUpperArmZ + arch * 0.7;
+                  bones.rightUpperArm.rotation.x = -arch * 0.25;
                 }
                 if (bones.rightLowerArm) {
-                  bones.rightLowerArm.rotation.z = bones.baseRightLowerArmZ + arch * 0.55;
-                  bones.rightLowerArm.rotation.x = -arch * 0.85;
+                  bones.rightLowerArm.rotation.z = bones.baseRightLowerArmZ + arch * 0.4;
+                  bones.rightLowerArm.rotation.x = -arch * 0.6;
                 }
                 break;
             }
