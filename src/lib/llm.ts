@@ -35,11 +35,14 @@ export const PROVIDERS: Record<Provider, ProviderConfig> = {
     endpoint: "https://openrouter.ai/api/v1/chat/completions",
     keyUrl: "https://openrouter.ai/keys",
     keyHint: "Starts with sk-or-v1-…",
-    defaultModel: "anthropic/claude-3.5-sonnet",
+    // Default to a FREE model so a freshly-pasted key costs the user $0.
+    defaultModel: "google/gemini-2.0-flash-exp:free",
     models: [
-      { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet", note: "Best writing quality" },
-      { id: "openai/gpt-4o-mini", label: "GPT-4o mini", note: "Cheapest, still good" },
-      { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash", note: "Fast and cheap" },
+      { id: "google/gemini-2.0-flash-exp:free", label: "Gemini 2.0 Flash", note: "FREE" },
+      { id: "meta-llama/llama-3.3-70b-instruct:free", label: "Llama 3.3 70B", note: "FREE" },
+      { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet", note: "Best writing — paid" },
+      { id: "openai/gpt-4o-mini", label: "GPT-4o mini", note: "Cheap" },
+      { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash", note: "Fast + cheap" },
       { id: "anthropic/claude-3.5-haiku", label: "Claude 3.5 Haiku" },
       { id: "mistralai/mistral-large-2411", label: "Mistral Large (via OR)" },
       { id: "mistralai/mistral-small-2503", label: "Mistral Small (via OR)" },
@@ -99,6 +102,107 @@ export const RECOMMENDED_MODELS = PROVIDERS.openrouter.models;
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+}
+
+/** Error carrying the HTTP status so callers can humanise it. */
+export class LlmHttpError extends Error {
+  status: number;
+  providerLabel: string;
+  constructor(status: number, providerLabel: string, detail: string) {
+    super(`${providerLabel} ${status}: ${detail}`);
+    this.name = "LlmHttpError";
+    this.status = status;
+    this.providerLabel = providerLabel;
+  }
+}
+
+/**
+ * Turn any streamChat error into a short, friendly, non-technical message the
+ * character can show. Keeps users out of raw JSON / stack traces.
+ */
+export function humanizeError(err: unknown, providerShortName = "the AI"): string {
+  const status = err instanceof LlmHttpError ? err.status : undefined;
+  const msg = err instanceof Error ? err.message : String(err);
+
+  if (status === 401 || status === 403) {
+    return `That ${providerShortName} key looks invalid — double-check it in ⚙ Settings.`;
+  }
+  if (status === 402) {
+    return `Your ${providerShortName} account is out of credit. Add funds or switch to a FREE model in Settings.`;
+  }
+  if (status === 429) {
+    return `Rate limited — wait a moment, or pick a cheaper / FREE model in Settings.`;
+  }
+  if (status === 404) {
+    return `That model isn't available on your ${providerShortName} plan — pick another in Settings.`;
+  }
+  if (status && status >= 500) {
+    return `${providerShortName} is having a moment (server error). Try again in a bit.`;
+  }
+  // Network-ish failures (fetch throws TypeError "Failed to fetch", etc.)
+  if (/failed to fetch|networkerror|load failed|ecConnRefused|enotfound/i.test(msg)) {
+    return `No connection — check your internet and try again.`;
+  }
+  return `Something went wrong talking to ${providerShortName}. Try again, or check ⚙ Settings.`;
+}
+
+/**
+ * Validate an API key with a tiny 1-token request. Used by the "Test key"
+ * buttons in onboarding + settings so users know the key works before relying
+ * on it. Resolves quickly — aborts as soon as the first token arrives.
+ */
+export function pingProvider(opts: {
+  provider: Provider;
+  apiKey: string;
+  model: string;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const { provider, apiKey, model } = opts;
+  if (!apiKey.trim()) return Promise.resolve({ ok: false, reason: "no key" });
+
+  return new Promise((resolve) => {
+    const controller = new AbortController();
+    let settled = false;
+    const done = (result: { ok: boolean; reason?: string }) => {
+      if (settled) return;
+      settled = true;
+      try { controller.abort(); } catch { /* noop */ }
+      resolve(result);
+    };
+    // Hard timeout so a hung request doesn't leave the spinner forever.
+    const timeout = setTimeout(() => done({ ok: false, reason: "timeout" }), 15_000);
+
+    void streamChat({
+      provider,
+      apiKey,
+      model,
+      messages: [{ role: "user", content: "hi" }],
+      systemPrompt: "Reply with a single word.",
+      maxTokens: 1,
+      onDelta: () => {
+        clearTimeout(timeout);
+        done({ ok: true });
+      },
+      onDone: () => {
+        clearTimeout(timeout);
+        done({ ok: true });
+      },
+      onError: (err) => {
+        clearTimeout(timeout);
+        done({ ok: false, reason: humanizeError(err, providerShortName(provider)) });
+      },
+      signal: controller.signal,
+    });
+  });
+}
+
+/** Short human label for a provider (used in error messages). */
+export function providerShortName(p: Provider): string {
+  switch (p) {
+    case "mistral": return "Mistral";
+    case "openai": return "OpenAI";
+    case "anthropic": return "Anthropic";
+    default: return "OpenRouter";
+  }
 }
 
 export interface StreamOptions {
@@ -191,7 +295,7 @@ async function streamOpenAICompat(opts: StreamOptions, cfg: ProviderConfig): Pro
 
     if (!response.ok) {
       const text = await response.text().catch(() => "<unreadable>");
-      throw new Error(`${cfg.label} ${response.status}: ${text.slice(0, 300)}`);
+      throw new LlmHttpError(response.status, cfg.label, text.slice(0, 300));
     }
     if (!response.body) throw new Error("No response body");
 
@@ -281,7 +385,7 @@ async function streamAnthropic(opts: StreamOptions, cfg: ProviderConfig): Promis
 
     if (!response.ok) {
       const text = await response.text().catch(() => "<unreadable>");
-      throw new Error(`${cfg.label} ${response.status}: ${text.slice(0, 300)}`);
+      throw new LlmHttpError(response.status, cfg.label, text.slice(0, 300));
     }
     if (!response.body) throw new Error("No response body");
 

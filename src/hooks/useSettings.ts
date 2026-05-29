@@ -31,6 +31,14 @@ export interface Settings {
   elevenLabsVoiceId: string;
   /** License key from the Pro purchase flow (NOWPayments → webhook → email). */
   licenseKey: string;
+  /** First-run onboarding completed flag. */
+  onboardingShown: boolean;
+  /** Cached result of server-side license verification (see config.verifyLicenseRemote). */
+  licenseValid: boolean;
+  /** Verified plan ("pro" | "dlc") or "" if none. */
+  licensePlan: string;
+  /** Epoch ms of last successful verification — used for 24h cache + offline grace. */
+  licenseCheckedAt: number;
 }
 
 const DEFAULTS: Settings = {
@@ -39,7 +47,8 @@ const DEFAULTS: Settings = {
   openAIKey: "",
   anthropicKey: "",
   mistralKey: "",
-  model: "anthropic/claude-3.5-sonnet",
+  // Default to a FREE OpenRouter model so a first-time key costs the user $0.
+  model: "google/gemini-2.0-flash-exp:free",
   userName: "",
   userGoals: "",
   personality: "friendly",
@@ -49,6 +58,10 @@ const DEFAULTS: Settings = {
   elevenLabsKey: "",
   elevenLabsVoiceId: "21m00Tcm4TlvDq8ikWAM",
   licenseKey: "",
+  onboardingShown: false,
+  licenseValid: false,
+  licensePlan: "",
+  licenseCheckedAt: 0,
 };
 
 const STORAGE_KEY = "anime-buddy:settings:v1";

@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { PROVIDERS, type Provider } from "../lib/llm";
+import { PROVIDERS, pingProvider, type Provider } from "../lib/llm";
 import { PERSONALITY_MODES, type PersonalityMode } from "../lib/personality";
 import { ELEVEN_VOICE_PRESETS } from "../lib/elevenlabs";
-import { checkoutUrl } from "../lib/config";
+import { checkoutUrl, recoverLicenseByEmail } from "../lib/config";
 import type { Settings } from "../hooks/useSettings";
 import { IconClose, IconEye, IconEyeOff } from "./icons/Icons";
 
@@ -27,6 +27,10 @@ interface Props {
 
 export function SettingsModal({ open, onClose, settings, onChange, tts, onShowPomodoroInfo }: Props) {
   const [revealKey, setRevealKey] = useState(false);
+  const [testState, setTestState] = useState<"idle" | "testing" | "ok" | "fail">("idle");
+  const [testMsg, setTestMsg] = useState("");
+  const [recoverEmail, setRecoverEmail] = useState("");
+  const [recoverState, setRecoverState] = useState<"idle" | "sending" | "sent" | "fail">("idle");
   const providerCfg = PROVIDERS[settings.provider];
 
   const currentKey = (() => {
@@ -39,12 +43,38 @@ export function SettingsModal({ open, onClose, settings, onChange, tts, onShowPo
   })();
 
   const setProviderKey = (value: string) => {
+    setTestState("idle");
     switch (settings.provider) {
       case "mistral": onChange({ mistralKey: value }); break;
       case "openai": onChange({ openAIKey: value }); break;
       case "anthropic": onChange({ anthropicKey: value }); break;
       default: onChange({ openRouterKey: value }); break;
     }
+  };
+
+  const runTest = async () => {
+    if (!currentKey.trim()) return;
+    setTestState("testing");
+    setTestMsg("");
+    const res = await pingProvider({
+      provider: settings.provider,
+      apiKey: currentKey,
+      model: settings.model,
+    });
+    if (res.ok) {
+      setTestState("ok");
+      setTestMsg("Works!");
+    } else {
+      setTestState("fail");
+      setTestMsg(res.reason || "Couldn't reach the model");
+    }
+  };
+
+  const handleRecover = async () => {
+    if (!recoverEmail.trim()) return;
+    setRecoverState("sending");
+    const res = await recoverLicenseByEmail(recoverEmail.trim());
+    setRecoverState(res.ok ? "sent" : "fail");
   };
 
   const providerShortName = (() => {
@@ -196,6 +226,18 @@ export function SettingsModal({ open, onClose, settings, onChange, tts, onShowPo
             >
               {revealKey ? <IconEyeOff width={14} height={14} /> : <IconEye width={14} height={14} />}
             </button>
+          </div>
+          <div className="settings-test-row">
+            <button
+              type="button"
+              className="settings-test-btn"
+              onClick={runTest}
+              disabled={!currentKey.trim() || testState === "testing"}
+            >
+              {testState === "testing" ? "Testing…" : "Test key"}
+            </button>
+            {testState === "ok" ? <span className="settings-test ok">✓ {testMsg}</span> : null}
+            {testState === "fail" ? <span className="settings-test fail">✗ {testMsg}</span> : null}
           </div>
         </label>
 
@@ -365,7 +407,41 @@ export function SettingsModal({ open, onClose, settings, onChange, tts, onShowPo
             autoCorrect="off"
             autoCapitalize="off"
           />
+          {settings.licenseKey && settings.licenseValid ? (
+            <span className="settings-hint">✓ Pro verified{settings.licensePlan ? ` (${settings.licensePlan})` : ""}.</span>
+          ) : null}
         </label>
+
+        {/* ============ Lost key recovery ============ */}
+        <div className="settings-section">
+          <span className="settings-section-title">Lost your key?</span>
+          <div className="settings-key-row">
+            <input
+              className="settings-input"
+              type="email"
+              value={recoverEmail}
+              onChange={(e) => { setRecoverEmail(e.target.value); setRecoverState("idle"); }}
+              placeholder="Email used at purchase"
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+            />
+            <button
+              type="button"
+              className="settings-test-btn"
+              onClick={handleRecover}
+              disabled={!recoverEmail.trim() || recoverState === "sending"}
+            >
+              {recoverState === "sending" ? "Sending…" : "Resend"}
+            </button>
+          </div>
+          {recoverState === "sent" ? (
+            <span className="settings-test ok">✓ If that email bought Lumi, the key is on its way.</span>
+          ) : null}
+          {recoverState === "fail" ? (
+            <span className="settings-test fail">✗ Couldn't send — check the email or try later.</span>
+          ) : null}
+        </div>
 
         {/* ============ Help ============ */}
         {onShowPomodoroInfo ? (

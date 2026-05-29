@@ -1262,3 +1262,231 @@ input, textarea, select {
   transform: translateY(-2px);
   box-shadow: 0 10px 22px rgba(255, 103, 137, 0.55);
 }
+
+/* ============================================================
+   Onboarding panel (slides down, like Settings)
+   ============================================================ */
+.onb-panel { transform: translateY(-100%); }
+.onb-panel.open { transform: translateY(0); }
+.onb-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pink-200) transparent;
+}
+.onb-body::-webkit-scrollbar { width: 6px; }
+.onb-body::-webkit-scrollbar-thumb { background: var(--pink-200); border-radius: 3px; }
+.onb-hero {
+  text-align: center;
+  padding: 4px 0 2px;
+}
+.onb-hero-title {
+  font-family: "Quicksand", sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--pink-500), #B575C7);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 6px;
+}
+.onb-hero-text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.onb-hero-text strong { color: var(--ink); }
+.onb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  border: 1.5px solid var(--pink-200);
+  border-radius: 12px;
+  background: rgba(255, 246, 248, 0.5);
+}
+.onb-card-title {
+  font-family: "Quicksand", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.onb-card-sub {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  margin: -4px 0 2px;
+}
+.onb-card-sub strong { color: var(--pink-600); }
+.onb-getkey {
+  align-self: flex-start;
+  background: #fff;
+  color: var(--pink-600);
+  border: 1.5px solid var(--pink-300);
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms, transform 140ms;
+}
+.onb-getkey:hover { background: var(--pink-50); transform: translateY(-1px); }
+.onb-test-row, .settings-test-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.onb-test-btn, .settings-test-btn {
+  background: linear-gradient(135deg, var(--pink-300), var(--pink-500));
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  padding: 7px 13px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 140ms, box-shadow 140ms, opacity 140ms;
+  box-shadow: 0 2px 6px rgba(255, 103, 137, 0.25);
+  flex-shrink: 0;
+}
+.onb-test-btn:hover:not(:disabled), .settings-test-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px rgba(255, 103, 137, 0.4);
+}
+.onb-test-btn:disabled, .settings-test-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.onb-test, .settings-test {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.onb-test.ok, .settings-test.ok { color: #2E9E5B; }
+.onb-test.fail, .settings-test.fail { color: #D2453E; }
+.onb-cta {
+  width: 100%;
+  background: linear-gradient(135deg, var(--pink-400), var(--pink-600));
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 13px;
+  font-family: "Quicksand", sans-serif;
+  font-weight: 800;
+  font-size: 13.5px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255, 103, 137, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 140ms, box-shadow 140ms;
+  margin-top: 2px;
+}
+.onb-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(255, 103, 137, 0.55); }
+
+/* ============ Chat: no-key CTA + retry ============ */
+.chat-cta {
+  margin: auto;
+  text-align: center;
+  padding: 24px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.chat-cta-emoji { font-size: 30px; }
+.chat-cta-title {
+  font-family: "Quicksand", sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--ink);
+}
+.chat-cta-sub {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  max-width: 240px;
+}
+.chat-cta-sub strong { color: var(--pink-600); }
+.chat-cta-btn {
+  margin-top: 6px;
+  background: linear-gradient(135deg, var(--pink-400), var(--pink-600));
+  color: #fff;
+  border: none;
+  border-radius: 11px;
+  padding: 11px 18px;
+  font-family: "Quicksand", sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255, 103, 137, 0.4);
+  transition: transform 140ms, box-shadow 140ms;
+}
+.chat-cta-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(255, 103, 137, 0.55); }
+.chat-retry {
+  margin-left: 8px;
+  background: var(--pink-100);
+  color: var(--pink-600);
+  border: 1px solid var(--pink-300);
+  border-radius: 7px;
+  padding: 2px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.chat-retry:hover:not(:disabled) { background: var(--pink-200); }
+.chat-retry:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ============================================================
+   Crash screen (ErrorBoundary fallback)
+   ============================================================ */
+.crash-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(255, 250, 252, 0.97), rgba(255, 240, 245, 0.97));
+  backdrop-filter: blur(20px);
+  border-radius: 22px;
+}
+.crash-emoji { font-size: 34px; }
+.crash-title {
+  font-family: "Quicksand", sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--ink);
+}
+.crash-sub {
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.45;
+  max-width: 260px;
+}
+.crash-btn {
+  margin-top: 8px;
+  background: linear-gradient(135deg, var(--pink-400), var(--pink-600));
+  color: #fff;
+  border: none;
+  border-radius: 11px;
+  padding: 10px 20px;
+  font-family: "Quicksand", sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255, 103, 137, 0.4);
+}
+.crash-detail {
+  margin-top: 12px;
+  font-size: 9.5px;
+  color: var(--ink-mute);
+  font-family: "JetBrains Mono", monospace;
+  max-width: 280px;
+  word-break: break-word;
+  opacity: 0.7;
+}

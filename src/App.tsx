@@ -4,6 +4,7 @@ import { Character } from "./components/Character";
 import { SpeechBubble } from "./components/SpeechBubble";
 import { ChatPanel } from "./components/ChatPanel";
 import { SettingsModal } from "./components/SettingsModal";
+import { OnboardingModal } from "./components/OnboardingModal";
 import { PomodoroBar } from "./components/PomodoroBar";
 import { PomodoroInfoModal } from "./components/PomodoroInfoModal";
 import { ParticleField } from "./components/ParticleField";
@@ -25,12 +26,14 @@ import { useActiveWindow } from "./hooks/useActiveWindow";
 import { useSnapToEdge } from "./hooks/useSnapToEdge";
 import { useHideOnFullscreen } from "./hooks/useHideOnFullscreen";
 import { loadRecentMessages, appendMessage, clearMessages } from "./lib/db";
+import { verifyLicenseRemote } from "./lib/config";
 import "./App.css";
 
 function App() {
   const [chatOpen, setChatOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [lastUtterance, setLastUtterance] = useState<{ text: string; streaming: boolean }>({
     text: "",
     streaming: false,
@@ -40,13 +43,44 @@ function App() {
 
   const { settings, setSettings } = useSettings();
 
-  // Show the Pomodoro explainer once on first launch.
+  // First launch → onboarding (which also covers the Pomodoro pitch). The
+  // standalone Pomodoro explainer stays reachable from the ? button.
   useEffect(() => {
-    if (!settings.pomodoroIntroShown) {
-      const t = window.setTimeout(() => setInfoOpen(true), 1200);
+    if (!settings.onboardingShown) {
+      const t = window.setTimeout(() => setOnboardingOpen(true), 900);
       return () => window.clearTimeout(t);
     }
-  }, [settings.pomodoroIntroShown]);
+  }, [settings.onboardingShown]);
+
+  // ---- Real Pro license verification (server-side HMAC check) ----
+  // Gates Pro on a verified result, not on "any non-empty string". Caches for
+  // 24h; on network failure we keep a previously-valid, unexpired result
+  // (offline grace).
+  useEffect(() => {
+    const key = settings.licenseKey.trim();
+    if (!key) {
+      if (settings.licenseValid) setSettings({ licenseValid: false, licensePlan: "" });
+      return;
+    }
+    const fresh = Date.now() - settings.licenseCheckedAt < 24 * 60 * 60 * 1000;
+    if (settings.licenseValid && fresh) return; // cached + recent — skip
+    let cancelled = false;
+    void verifyLicenseRemote(key).then((res) => {
+      if (cancelled) return;
+      if (res.valid) {
+        setSettings({
+          licenseValid: true,
+          licensePlan: res.plan ?? "pro",
+          licenseCheckedAt: Date.now(),
+        });
+      } else if (!settings.licenseValid) {
+        // Only downgrade if we weren't already valid (offline grace).
+        setSettings({ licenseValid: false, licensePlan: "" });
+      }
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.licenseKey]);
 
   const tts = useTTS({
     onAmplitude: setMouthAmp,
@@ -54,7 +88,8 @@ function App() {
     showAllVoices: settings.showAllVoices,
     elevenLabsKey: settings.elevenLabsKey,
     elevenLabsVoiceId: settings.elevenLabsVoiceId,
-    licenseKey: settings.licenseKey,
+    // Gate Pro voice on the VERIFIED license, not the raw key string.
+    licenseKey: settings.licenseValid ? settings.licenseKey : "",
   });
   const activeWin = useActiveWindow(8000);
   const distractionNudgedRef = useRef<number>(0);
@@ -112,6 +147,10 @@ function App() {
     model: settings.model,
     buildContext,
     onAssistantTurn,
+    onNeedsKey: () => {
+      setChatOpen(false);
+      setOnboardingOpen(true);
+    },
   });
 
   // ---- SQLite chat history: load on mount + append on each finalized turn ----
@@ -283,6 +322,12 @@ function App() {
         busy={chat.busy}
         onSend={chat.send}
         onClear={handleClearChat}
+        onRetry={chat.retry}
+        hasKey={!!activeKey(settings)}
+        onSetupKey={() => {
+          setChatOpen(false);
+          setOnboardingOpen(true);
+        }}
       />
       <SettingsModal
         open={settingsOpen}
@@ -294,6 +339,12 @@ function App() {
           setSettingsOpen(false);
           setInfoOpen(true);
         }}
+      />
+      <OnboardingModal
+        open={onboardingOpen}
+        onClose={() => setOnboardingOpen(false)}
+        settings={settings}
+        onChange={setSettings}
       />
       <PomodoroInfoModal
         open={infoOpen}

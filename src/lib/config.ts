@@ -51,21 +51,45 @@ export function checkoutUrl(plan: "pro" | "dlc", opts: { email?: string; product
   return u.toString();
 }
 
-/** Calls the worker /verify-license endpoint. */
+/** Base URL for the Vercel API. Falls back to prod when env isn't set. */
+const API_BASE = (PAYMENTS.workerUrl || "https://lumi-bloom0.vercel.app").replace(/\/$/, "");
+
+/** Calls the /api/verify-license endpoint (Vercel Edge Function). */
 export async function verifyLicenseRemote(key: string): Promise<{
   valid: boolean;
   plan?: "pro" | "dlc";
   expiresAt?: number;
+  email?: string;
 }> {
-  if (!PAYMENTS.workerUrl || !key) return { valid: false };
+  if (!key) return { valid: false };
   try {
     const r = await fetch(
-      `${PAYMENTS.workerUrl.replace(/\/$/, "")}/verify-license?key=${encodeURIComponent(key)}`,
+      `${API_BASE}/api/verify-license?key=${encodeURIComponent(key)}`,
     );
     if (!r.ok) return { valid: false };
     return await r.json();
   } catch {
+    // Network failure — caller applies offline grace from cached state.
     return { valid: false };
+  }
+}
+
+/** Calls /api/recover-license to re-send the license email to a buyer. */
+export async function recoverLicenseByEmail(email: string): Promise<{
+  ok: boolean;
+  sent?: boolean;
+  reason?: string;
+}> {
+  if (!email) return { ok: false, reason: "no email" };
+  try {
+    const r = await fetch(
+      `${API_BASE}/api/recover-license?email=${encodeURIComponent(email)}`,
+    );
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, reason: data?.reason || `HTTP ${r.status}` };
+    return { ok: true, sent: !!data?.sent };
+  } catch {
+    return { ok: false, reason: "network" };
   }
 }
 

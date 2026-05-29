@@ -1,5 +1,12 @@
 import { useCallback, useRef, useState } from "react";
-import { streamChat, PROVIDERS, type ChatMessage, type Provider } from "../lib/llm";
+import {
+  streamChat,
+  PROVIDERS,
+  humanizeError,
+  providerShortName,
+  type ChatMessage,
+  type Provider,
+} from "../lib/llm";
 import { buildSystemPrompt, type PersonalityContext } from "../lib/personality";
 
 export interface ChatTurn {
@@ -18,6 +25,8 @@ export interface UseChatOpts {
   buildContext: () => PersonalityContext;
   /** Called when a new assistant turn finishes streaming. */
   onAssistantTurn?: (text: string) => void;
+  /** Called when the user tries to chat but no API key is configured. */
+  onNeedsKey?: () => void;
 }
 
 function genId(): string {
@@ -27,7 +36,14 @@ function genId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export function useChat({ provider, apiKey, model, buildContext, onAssistantTurn }: UseChatOpts) {
+export function useChat({
+  provider,
+  apiKey,
+  model,
+  buildContext,
+  onAssistantTurn,
+  onNeedsKey,
+}: UseChatOpts) {
   const [turns, setTurnsState] = useState<ChatTurn[]>([]);
   const [busy, setBusy] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
@@ -38,52 +54,12 @@ export function useChat({ provider, apiKey, model, buildContext, onAssistantTurn
     else setTurnsState(next);
   }, []);
 
-  const send = useCallback(
-    async (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed) return;
-      if (busy) return;
-
-      if (!apiKey) {
-        const cfg = PROVIDERS[provider];
-        const providerLabel = (() => {
-          switch (provider) {
-            case "mistral": return "Mistral";
-            case "openai": return "OpenAI";
-            case "anthropic": return "Anthropic";
-            default: return "OpenRouter";
-          }
-        })();
-        const url = cfg.keyUrl.replace(/^https?:\/\//, "");
-        setTurnsState((t) => [
-          ...t,
-          { id: genId(), role: "user", content: trimmed },
-          {
-            id: genId(),
-            role: "assistant",
-            content: `I need a ${providerLabel} API key first. Open ⚙ Settings and paste it — grab one at ${url} ✨`,
-          },
-        ]);
-        return;
-      }
-
-      const userTurn: ChatTurn = { id: genId(), role: "user", content: trimmed };
-      const assistantId = genId();
-      setTurnsState((t) => [
-        ...t,
-        userTurn,
-        { id: assistantId, role: "assistant", content: "", streaming: true },
-      ]);
+  // Core streaming routine — streams an assistant reply for a given history.
+  const runStream = useCallback(
+    async (history: ChatMessage[], assistantId: string) => {
       setBusy(true);
-
       const controller = new AbortController();
       controllerRef.current = controller;
-
-      const history: ChatMessage[] = [...turns, userTurn].map((t) => ({
-        role: t.role,
-        content: t.content,
-      }));
-
       let buffer = "";
       await streamChat({
         provider,
@@ -107,7 +83,13 @@ export function useChat({ provider, apiKey, model, buildContext, onAssistantTurn
         onError: (err) => {
           setTurnsState((t) =>
             t.map((x) =>
-              x.id === assistantId ? { ...x, streaming: false, error: err.message } : x,
+              x.id === assistantId
+                ? {
+                    ...x,
+                    streaming: false,
+                    error: humanizeError(err, providerShortName(provider)),
+                  }
+                : x,
             ),
           );
           setBusy(false);
@@ -115,8 +97,76 @@ export function useChat({ provider, apiKey, model, buildContext, onAssistantTurn
         signal: controller.signal,
       });
     },
-    [provider, apiKey, model, busy, turns, buildContext, onAssistantTurn],
+    [provider, apiKey, model, buildContext, onAssistantTurn],
   );
+
+  const send = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      if (busy) return;
+
+      if (!apiKey) {
+        const cfg = PROVIDERS[provider];
+        const label = providerShortName(provider);
+        const url = cfg.keyUrl.replace(/^https?:\/\//, "");
+        setTurnsState((t) => [
+          ...t,
+          { id: genId(), role: "user", content: trimmed },
+          {
+            id: genId(),
+            role: "assistant",
+            content: `I'd love to chat! I just need a free ${label} key first — tap the button below or open ⚙ Settings. Grab one at ${url} ✨`,
+          },
+        ]);
+        onNeedsKey?.();
+        return;
+      }
+
+      const userTurn: ChatTurn = { id: genId(), role: "user", content: trimmed };
+      const assistantId = genId();
+      setTurnsState((t) => [
+        ...t,
+        userTurn,
+        { id: assistantId, role: "assistant", content: "", streaming: true },
+      ]);
+
+      const history: ChatMessage[] = [...turns, userTurn].map((t) => ({
+        role: t.role,
+        content: t.content,
+      }));
+      await runStream(history, assistantId);
+    },
+    [provider, apiKey, busy, turns, runStream, onNeedsKey],
+  );
+
+  // Retry the last user message after an error — drops the errored assistant
+  // turn and re-streams from the cleaned history (no duplicate user turn).
+  const retry = useCallback(async () => {
+    if (busy) return;
+    // Find the last user message.
+    let lastUserIdx = -1;
+    for (let i = turns.length - 1; i >= 0; i--) {
+      if (turns[i].role === "user") {
+        lastUserIdx = i;
+        break;
+      }
+    }
+    if (lastUserIdx === -1) return;
+
+    // History up to and including the last user message.
+    const history: ChatMessage[] = turns
+      .slice(0, lastUserIdx + 1)
+      .map((t) => ({ role: t.role, content: t.content }));
+
+    const assistantId = genId();
+    // Replace everything after the last user turn with a fresh streaming turn.
+    setTurnsState((t) => [
+      ...t.slice(0, lastUserIdx + 1),
+      { id: assistantId, role: "assistant", content: "", streaming: true },
+    ]);
+    await runStream(history, assistantId);
+  }, [busy, turns, runStream]);
 
   const cancel = useCallback(() => {
     controllerRef.current?.abort();
@@ -125,5 +175,5 @@ export function useChat({ provider, apiKey, model, buildContext, onAssistantTurn
 
   const clear = useCallback(() => setTurnsState([]), []);
 
-  return { turns, busy, send, cancel, clear, setTurns };
+  return { turns, busy, send, retry, cancel, clear, setTurns };
 }

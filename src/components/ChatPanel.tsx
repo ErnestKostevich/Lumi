@@ -9,9 +9,25 @@ interface Props {
   busy: boolean;
   onSend: (text: string) => void;
   onClear: () => void;
+  /** Retry the last user message after an error. */
+  onRetry?: () => void;
+  /** Whether an API key is configured (drives the empty-state CTA). */
+  hasKey?: boolean;
+  /** Open onboarding / settings so the user can add a key. */
+  onSetupKey?: () => void;
 }
 
-export function ChatPanel({ open, onClose, turns, busy, onSend, onClear }: Props) {
+export function ChatPanel({
+  open,
+  onClose,
+  turns,
+  busy,
+  onSend,
+  onClear,
+  onRetry,
+  hasKey = true,
+  onSetupKey,
+}: Props) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -55,18 +71,45 @@ export function ChatPanel({ open, onClose, turns, busy, onSend, onClear }: Props
 
       <div className="chat-list" ref={listRef}>
         {turns.length === 0 ? (
-          <div className="chat-empty">
-            Say hi to Lumi 🌸 — or ask for a Pomodoro.
-          </div>
-        ) : (
-          turns.map((t) => (
-            <div key={t.id} className={`chat-bubble ${t.role}`}>
-              <div className="chat-bubble-text">
-                {t.content || (t.streaming ? "…" : "")}
-              </div>
-              {t.error ? <div className="chat-error">⚠ {t.error}</div> : null}
+          hasKey ? (
+            <div className="chat-empty">
+              Say hi to Lumi 🌸 — or ask for a Pomodoro.
             </div>
-          ))
+          ) : (
+            <div className="chat-cta">
+              <div className="chat-cta-emoji">🔌</div>
+              <div className="chat-cta-title">Give Lumi a brain to chat</div>
+              <div className="chat-cta-sub">
+                Add a <strong>free</strong> AI key (~60s, no card) and I'll start talking.
+              </div>
+              {onSetupKey ? (
+                <button className="chat-cta-btn" onClick={onSetupKey}>
+                  ✨ Set up AI chat
+                </button>
+              ) : null}
+            </div>
+          )
+        ) : (
+          turns.map((t, i) => {
+            const isLast = i === turns.length - 1;
+            return (
+              <div key={t.id} className={`chat-bubble ${t.role}`}>
+                <div className="chat-bubble-text">
+                  {t.content || (t.streaming ? "…" : "")}
+                </div>
+                {t.error ? (
+                  <div className="chat-error">
+                    ⚠ {t.error}
+                    {isLast && onRetry ? (
+                      <button className="chat-retry" onClick={onRetry} disabled={busy}>
+                        Retry
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
         )}
       </div>
 

@@ -12,7 +12,7 @@ describe("useSettings", () => {
     expect(result.current.settings.provider).toBe("openrouter");
     expect(result.current.settings.openRouterKey).toBe("");
     expect(result.current.settings.mistralKey).toBe("");
-    expect(result.current.settings.model).toBe("anthropic/claude-3.5-sonnet");
+    expect(result.current.settings.model).toBe("google/gemini-2.0-flash-exp:free");
     expect(result.current.settings.userName).toBe("");
     expect(result.current.settings.userGoals).toBe("");
     expect(result.current.settings.showAllVoices).toBe(false);
