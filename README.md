@@ -4,12 +4,12 @@
 
 **Your anime study buddy. A 3D kawaii AI character who lives on your desktop, runs your Pomodoros, and nags you when you slip into YouTube.**
 
-[![release](https://img.shields.io/github/v/release/ErnestKostevich/Project-0?include_prereleases&color=ff6789&label=release)](https://github.com/ErnestKostevich/Project-0/releases/latest)
+[![release](https://img.shields.io/github/v/release/ErnestKostevich/Lumi?include_prereleases&color=ff6789&label=release)](https://github.com/ErnestKostevich/Lumi/releases/latest)
 [![license](https://img.shields.io/badge/license-MIT--like-ff6789)](#license)
 [![tests](https://img.shields.io/badge/tests-22%2F22%20passing-22c55e)](#tests)
 [![platforms](https://img.shields.io/badge/platforms-Win%20%C2%B7%20macOS%20%C2%B7%20Linux-ff6789)](#download)
 
-[**Live site →**](https://lumi-bloom0.vercel.app) · [**Latest release →**](https://github.com/ErnestKostevich/Project-0/releases/latest) · [**Issues →**](https://github.com/ErnestKostevich/Project-0/issues)
+[**Live site →**](https://lumi-bloom0.vercel.app) · [**Latest release →**](https://github.com/ErnestKostevich/Lumi/releases/latest) · [**Issues →**](https://github.com/ErnestKostevich/Lumi/issues)
 
 </div>
 
@@ -19,11 +19,11 @@
 
 | Platform | File | Size | Notes |
 |---|---|---|---|
-| 🪟 Windows | [`Lumi_0.0.1_x64-setup.exe`](https://github.com/ErnestKostevich/Project-0/releases/latest) | 17 MB | NSIS installer (recommended) |
-| 🪟 Windows | [`Lumi_0.0.1_x64_en-US.msi`](https://github.com/ErnestKostevich/Project-0/releases/latest) | 18 MB | MSI (IT / Group Policy) |
-| 🍎 macOS | [`Lumi_0.0.1_aarch64.dmg`](https://github.com/ErnestKostevich/Project-0/releases/latest) | 18 MB | Apple Silicon (M1/M2/M3) |
-| 🐧 Linux | [`Lumi_0.0.1_amd64.AppImage`](https://github.com/ErnestKostevich/Project-0/releases/latest) | 90 MB | Portable |
-| 🐧 Linux | [`Lumi_0.0.1_amd64.deb`](https://github.com/ErnestKostevich/Project-0/releases/latest) | 19 MB | Debian / Ubuntu |
+| 🪟 Windows | [`Lumi_0.0.2_x64-setup.exe`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 17 MB | NSIS installer (recommended) |
+| 🪟 Windows | [`Lumi_0.0.2_x64_en-US.msi`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 18 MB | MSI (IT / Group Policy) |
+| 🍎 macOS | [`Lumi_0.0.2_aarch64.dmg`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 18 MB | Apple Silicon (M1/M2/M3) |
+| 🐧 Linux | [`Lumi_0.0.2_amd64.AppImage`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 90 MB | Portable |
+| 🐧 Linux | [`Lumi_0.0.2_amd64.deb`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 19 MB | Debian / Ubuntu |
 
 > **First-run warnings** (no code-signing on alpha):
 > - **Windows**: SmartScreen says "unrecognized publisher" → click **More info** → **Run anyway**
@@ -167,11 +167,11 @@ Drop any VRM file at `public/vrm/character.vrm` and Lumi will load it instead of
 - **@pixiv/three-vrm** — Pixiv's official VRM loader for three.js
 - **active-win-pos-rs** — cross-platform foreground window detection
 - **Tauri**, **softprops/action-gh-release**, **NOWPayments**, **Resend**, **Upstash**, **Vercel**
-- One-person indie dev project — feedback / bug reports welcome in [Issues](https://github.com/ErnestKostevich/Project-0/issues)
+- One-person indie dev project — feedback / bug reports welcome in [Issues](https://github.com/ErnestKostevich/Lumi/issues)
 
 ## License
 
-The source code in this repo is provided for transparency and feedback. The **binary distribution** (downloads from [Releases](https://github.com/ErnestKostevich/Project-0/releases)) and the **trademark "Lumi"** are owned by the project. Commercial use, redistribution, and forking-as-competitor are not granted by default — open an issue if you have a use case.
+The source code in this repo is provided for transparency and feedback. The **binary distribution** (downloads from [Releases](https://github.com/ErnestKostevich/Lumi/releases)) and the **trademark "Lumi"** are owned by the project. Commercial use, redistribution, and forking-as-competitor are not granted by default — open an issue if you have a use case.
 
 Bundled assets (VRM character, Live2D Hiyori samples, Cubism Core) retain their original licenses (CC0 / Cubism SDK Release License). Source files are MIT-style for educational reading.
 

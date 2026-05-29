@@ -121,26 +121,38 @@ jobs:
             dist/**/*.deb
           body: |
             ## Lumi — Anime AI Study Buddy
-            First public alpha. Strictly SFW productivity coach with a 3D anime character on your desktop.
+            Strictly SFW productivity coach with a 3D anime character on your desktop. She runs your Pomodoros, nudges you off YouTube, and actually talks back.
+
+            ### ✨ New in this release
+            - **60-second onboarding** — Lumi works the moment you open her (Pomodoro, voice, click reactions, no setup). For chat, a guided step gets you a **FREE** AI key.
+            - **FREE models by default** — defaults to a free OpenRouter model, so chat costs you $0.
+            - **4 AI providers** — OpenRouter, OpenAI, Anthropic and Mistral, all BYO-key.
+            - **"Test key" button** — know your key works before relying on it.
+            - **Friendly errors + Retry** — no more raw API error dumps.
+            - **Full-body character** — head-to-toe framing, calmer idle animations, fixed lip-sync.
+            - **Real Pro license verification** + **recover-by-email** if you lose your key.
 
             ### Downloads
-            - **Windows**: `Lumi_0.0.1_x64-setup.exe` (NSIS installer) or `Lumi_0.0.1_x64_en-US.msi`
-            - **macOS**: `Lumi_0.0.1_universal.dmg` (Apple Silicon + Intel)
-            - **Linux**: `lumi_0.0.1_amd64.AppImage` (portable) or `lumi_0.0.1_amd64.deb` (Debian/Ubuntu)
+            - **Windows**: `Lumi_0.0.2_x64-setup.exe` (NSIS installer) or `Lumi_0.0.2_x64_en-US.msi`
+            - **macOS**: `Lumi_0.0.2_aarch64.dmg` (Apple Silicon — M1/M2/M3)
+            - **Linux**: `Lumi_0.0.2_amd64.AppImage` (portable) or `Lumi_0.0.2_amd64.deb` (Debian/Ubuntu)
 
             ### First-run warnings (no code-signing on alpha)
             - **Windows**: SmartScreen will say "unrecognized publisher" → click **More info** → **Run anyway**
             - **macOS**: Right-click the .dmg → **Open**, then drag Lumi to Applications. First launch: System Settings → Privacy & Security → **Open anyway**
-            - **Linux**: `chmod +x lumi_*.AppImage && ./lumi_*.AppImage`
+            - **Linux**: `chmod +x Lumi_*.AppImage && ./Lumi_*.AppImage`
 
             ### Quick start
-            1. Open Lumi → ⚙ Settings → paste an OpenRouter or Mistral API key
+            1. Open Lumi — the welcome guide helps you grab a **free** AI key in ~60s
             2. Hit 🍅 to start a Pomodoro
             3. Click on the character → she reacts
 
+            ### Privacy
+            100% local. No telemetry. Your API key never leaves your machine. Active-window detection sees the window title only, never pixels.
+
             ### Known limitations (alpha)
             - No code-signing certificates yet (Steam release Q3 will fix this)
-            - License key delivery requires NOWPayments webhook configured
-            - macOS / Linux builds untested in production
+            - macOS Intel + Linux ARM not yet built
+            - Cloud sync / memory / character DLC coming post-launch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
