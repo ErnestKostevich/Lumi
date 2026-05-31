@@ -19,11 +19,11 @@
 
 | Platform | File | Size | Notes |
 |---|---|---|---|
-| 🪟 Windows | [`Lumi_0.0.2_x64-setup.exe`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 17 MB | NSIS installer (recommended) |
-| 🪟 Windows | [`Lumi_0.0.2_x64_en-US.msi`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 18 MB | MSI (IT / Group Policy) |
-| 🍎 macOS | [`Lumi_0.0.2_aarch64.dmg`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 18 MB | Apple Silicon (M1/M2/M3) |
-| 🐧 Linux | [`Lumi_0.0.2_amd64.AppImage`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 90 MB | Portable |
-| 🐧 Linux | [`Lumi_0.0.2_amd64.deb`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 19 MB | Debian / Ubuntu |
+| 🪟 Windows | [`Lumi_0.0.3_x64-setup.exe`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 17 MB | NSIS installer (recommended) |
+| 🪟 Windows | [`Lumi_0.0.3_x64_en-US.msi`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 18 MB | MSI (IT / Group Policy) |
+| 🍎 macOS | [`Lumi_0.0.3_aarch64.dmg`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 18 MB | Apple Silicon (M1/M2/M3) |
+| 🐧 Linux | [`Lumi_0.0.3_amd64.AppImage`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 90 MB | Portable |
+| 🐧 Linux | [`Lumi_0.0.3_amd64.deb`](https://github.com/ErnestKostevich/Lumi/releases/latest) | 19 MB | Debian / Ubuntu |
 
 > **First-run warnings** (no code-signing on alpha):
 > - **Windows**: SmartScreen says "unrecognized publisher" → click **More info** → **Run anyway**

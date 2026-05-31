@@ -264,28 +264,28 @@
 
         <a
           id="primary-download"
-          href="https://github.com/ErnestKostevich/Lumi/releases/tag/v0.0.2"
+          href="https://github.com/ErnestKostevich/Lumi/releases/tag/v0.0.3"
           class="cta cta-large"
         >
           <span id="primary-download-label">Download for your OS</span>
           <span class="cta-arrow">↓</span>
         </a>
         <div class="download-versions" id="download-versions">
-          <a class="dl-link" data-os="windows" href="https://github.com/ErnestKostevich/Lumi/releases/tag/v0.0.2">
+          <a class="dl-link" data-os="windows" href="https://github.com/ErnestKostevich/Lumi/releases/tag/v0.0.3">
             <span class="dl-os">Windows</span>
             <span class="dl-format">.exe installer</span>
           </a>
-          <a class="dl-link" data-os="linux" href="https://github.com/ErnestKostevich/Lumi/releases/tag/v0.0.2">
+          <a class="dl-link" data-os="linux" href="https://github.com/ErnestKostevich/Lumi/releases/tag/v0.0.3">
             <span class="dl-os">Linux</span>
             <span class="dl-format">.AppImage / .deb</span>
           </a>
-          <a class="dl-link" data-os="macos" href="https://github.com/ErnestKostevich/Lumi/releases/tag/v0.0.2">
+          <a class="dl-link" data-os="macos" href="https://github.com/ErnestKostevich/Lumi/releases/tag/v0.0.3">
             <span class="dl-os">macOS</span>
             <span class="dl-format">.dmg (Apple Silicon)</span>
           </a>
         </div>
         <div class="download-notice">
-          <strong>Heads up:</strong> v0.0.2 alpha. Windows shows an "unverified publisher" warning
+          <strong>Heads up:</strong> v0.0.3 alpha. Windows shows an "unverified publisher" warning
           (no code-signing cert yet) — click <em>More info → Run anyway</em>. macOS:
           right-click the .dmg → Open the first time. Steam release planned Q3 with proper signing.
         </div>
@@ -563,27 +563,27 @@
         const ua = navigator.userAgent;
         const plat = (navigator.userAgentData?.platform || navigator.platform || "").toLowerCase();
         // Direct tag URL — /latest/ doesn't list prereleases.
-        // Bump this when releasing v0.0.2 etc.
-        const release = "https://github.com/ErnestKostevich/Lumi/releases/download/v0.0.2";
+        // Bump this when releasing v0.0.3 etc.
+        const release = "https://github.com/ErnestKostevich/Lumi/releases/download/v0.0.3";
 
         let os = "windows";
         if (/mac|darwin/i.test(plat) || /Mac OS X/i.test(ua)) os = "macos";
         else if (/linux/i.test(plat)) os = "linux";
 
-        // Filenames match the artifacts in https://github.com/ErnestKostevich/Lumi/releases/tag/v0.0.2
+        // Filenames match the artifacts in https://github.com/ErnestKostevich/Lumi/releases/tag/v0.0.3
         const map = {
           windows: {
-            url: `${release}/Lumi_0.0.2_x64-setup.exe`,
+            url: `${release}/Lumi_0.0.3_x64-setup.exe`,
             label: "Download for Windows · .exe",
             available: true,
           },
           linux: {
-            url: `${release}/Lumi_0.0.2_amd64.AppImage`,
+            url: `${release}/Lumi_0.0.3_amd64.AppImage`,
             label: "Download for Linux · .AppImage",
             available: true,
           },
           macos: {
-            url: `${release}/Lumi_0.0.2_aarch64.dmg`,
+            url: `${release}/Lumi_0.0.3_aarch64.dmg`,
             label: "Download for macOS · .dmg (Apple Silicon)",
             available: true,
           },

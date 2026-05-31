@@ -1,6 +1,6 @@
 [package]
 name = "anime-buddy"
-version = "0.0.2"
+version = "0.0.3"
 description = "Lumi — Anime AI Study Buddy"
 authors = ["Ernest Kostevich"]
 edition = "2021"
