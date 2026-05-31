@@ -105,6 +105,25 @@ jobs:
       - name: list collected artifacts
         run: find dist -type f | sort
 
+      # Delete any pre-existing release for this tag (incl. hidden drafts left
+      # behind when a tag is force-moved — those make softprops fail with
+      # "Too many retries"). The runner GITHUB_TOKEN has contents:write, so it
+      # can see + delete drafts that an unauthenticated client cannot.
+      - name: clear stale release for this tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ids=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/releases?per_page=100" \
+            | python3 -c "import sys,json,os; t=os.environ['TAG']; print('\n'.join(str(r['id']) for r in json.load(sys.stdin) if r.get('tag_name')==t))")
+          for id in $ids; do
+            echo "deleting stale release id=$id for $TAG"
+            curl -s -X DELETE -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/releases/$id"
+          done
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
