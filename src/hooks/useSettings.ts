@@ -39,6 +39,8 @@ export interface Settings {
   licensePlan: string;
   /** Epoch ms of last successful verification — used for 24h cache + offline grace. */
   licenseCheckedAt: number;
+  /** Whether Lumi distils + uses long-term memory from conversations. */
+  memoryEnabled: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -62,6 +64,7 @@ const DEFAULTS: Settings = {
   licenseValid: false,
   licensePlan: "",
   licenseCheckedAt: 0,
+  memoryEnabled: true,
 };
 
 const STORAGE_KEY = "anime-buddy:settings:v1";

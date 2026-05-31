@@ -20,6 +20,7 @@ import {
 } from "./components/icons/Icons";
 import { useSettings, activeKey } from "./hooks/useSettings";
 import { useChat } from "./hooks/useChat";
+import { useMemory } from "./hooks/useMemory";
 import { usePomodoro, type PomodoroPhase } from "./hooks/usePomodoro";
 import { useTTS } from "./hooks/useTTS";
 import { useActiveWindow } from "./hooks/useActiveWindow";
@@ -108,10 +109,18 @@ function App() {
   );
   const pomodoro = usePomodoro(handlePhaseChange);
 
+  const memory = useMemory({
+    provider: settings.provider,
+    apiKey: activeKey(settings),
+    model: settings.model,
+    enabled: settings.memoryEnabled,
+  });
+
   const buildContext = useCallback(
     () => ({
       userName: settings.userName,
       userGoals: settings.userGoals,
+      memory: settings.memoryEnabled ? memory.getPromptBlock() : "",
       pomodoroPhase: pomodoro.phase,
       pomodoroRemaining: pomodoro.remaining,
       characterName: "Lumi",
@@ -124,6 +133,8 @@ function App() {
     [
       settings.userName,
       settings.userGoals,
+      settings.memoryEnabled,
+      memory,
       pomodoro.phase,
       pomodoro.remaining,
       settings.personality,
@@ -156,12 +167,18 @@ function App() {
   // ---- SQLite chat history: load on mount + append on each finalized turn ----
   const persistedUpTo = useRef(0);
   useEffect(() => {
-    loadRecentMessages(40).then((past) => {
-      if (past.length) {
-        chat.setTurns(past);
-        persistedUpTo.current = past.length;
-      }
-    }).catch(() => {/* db unavailable in browser preview */});
+    loadRecentMessages(40)
+      .then((past) => {
+        if (past.length) {
+          chat.setTurns(past);
+          persistedUpTo.current = past.length;
+        }
+        // Tell memory the baseline so it never re-distils already-loaded history.
+        memory.setBaseline(past.length);
+      })
+      .catch(() => {
+        memory.setBaseline(0);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -173,7 +190,9 @@ function App() {
       void appendMessage(t.role, t.content);
       persistedUpTo.current = i + 1;
     }
-  }, [chat.turns]);
+    // Feed finalized turns to the memory distiller (debounced, cost-safe).
+    memory.noteFinalizedTurns(chat.turns);
+  }, [chat.turns, memory]);
 
   const handleClearChat = useCallback(() => {
     chat.clear();
@@ -335,6 +354,9 @@ function App() {
         settings={settings}
         onChange={setSettings}
         tts={tts}
+        memoryFacts={memory.facts}
+        onForgetFact={memory.forget}
+        onClearMemory={memory.clearAll}
         onShowPomodoroInfo={() => {
           setSettingsOpen(false);
           setInfoOpen(true);

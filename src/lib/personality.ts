@@ -23,6 +23,8 @@ export const PERSONALITY_MODES: { id: PersonalityMode; label: string; descriptio
 export interface PersonalityContext {
   userName?: string;
   userGoals?: string;
+  /** Distilled long-term memory block (see lib/memory.ts). Injected verbatim. */
+  memory?: string;
   pomodoroPhase?: "idle" | "working" | "break";
   pomodoroRemaining?: number; // seconds
   characterName?: string;
@@ -95,6 +97,14 @@ export function buildSystemPrompt(ctx: PersonalityContext): string {
   if (ctx.userName) lines.push(`- User's name: ${ctx.userName}`);
   else lines.push("- You don't know the user's name yet — feel free to ask in your first reply");
   if (ctx.userGoals) lines.push(`- Current goals / what they're working on: ${ctx.userGoals}`);
+
+  if (ctx.memory && ctx.memory.trim()) {
+    lines.push(
+      "",
+      `WHAT YOU REMEMBER ABOUT ${ctx.userName || "them"} (from past conversations — reference naturally when relevant, never recite as a list, never claim perfect recall):`,
+      ctx.memory.trim(),
+    );
+  }
 
   if (ctx.pomodoroPhase === "working") {
     const mins = Math.ceil((ctx.pomodoroRemaining ?? 0) / 60);

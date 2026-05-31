@@ -5,6 +5,7 @@ import { PERSONALITY_MODES, type PersonalityMode } from "../lib/personality";
 import { ELEVEN_VOICE_PRESETS } from "../lib/elevenlabs";
 import { checkoutUrl, recoverLicenseByEmail } from "../lib/config";
 import type { Settings } from "../hooks/useSettings";
+import type { MemoryFact } from "../lib/memory";
 import { IconClose, IconEye, IconEyeOff } from "./icons/Icons";
 
 interface TTSHandle {
@@ -23,9 +24,23 @@ interface Props {
   onChange: (patch: Partial<Settings>) => void;
   tts?: TTSHandle;
   onShowPomodoroInfo?: () => void;
+  /** Long-term memory facts + controls (from useMemory). */
+  memoryFacts?: MemoryFact[];
+  onForgetFact?: (id: string) => void;
+  onClearMemory?: () => void;
 }
 
-export function SettingsModal({ open, onClose, settings, onChange, tts, onShowPomodoroInfo }: Props) {
+export function SettingsModal({
+  open,
+  onClose,
+  settings,
+  onChange,
+  tts,
+  onShowPomodoroInfo,
+  memoryFacts = [],
+  onForgetFact,
+  onClearMemory,
+}: Props) {
   const [revealKey, setRevealKey] = useState(false);
   const [testState, setTestState] = useState<"idle" | "testing" | "ok" | "fail">("idle");
   const [testMsg, setTestMsg] = useState("");
@@ -380,6 +395,56 @@ export function SettingsModal({ open, onClose, settings, onChange, tts, onShowPo
               </button>
             </div>
           )}
+        </div>
+
+        {/* ============ Memory ============ */}
+        <div className="settings-section">
+          <span className="settings-section-title">🧠 What Lumi remembers</span>
+          <label className="settings-row settings-row-inline">
+            <input
+              type="checkbox"
+              checked={settings.memoryEnabled}
+              onChange={(e) => onChange({ memoryEnabled: e.target.checked })}
+            />
+            <span className="settings-label settings-label-inline">
+              Remember our conversations (projects, goals, wins)
+            </span>
+          </label>
+          {settings.memoryEnabled ? (
+            memoryFacts.length === 0 ? (
+              <span className="settings-hint">
+                Nothing yet — chat a bit and I'll start remembering what matters. Stored only on
+                this device.
+              </span>
+            ) : (
+              <>
+                <div className="memory-list">
+                  {memoryFacts.map((f) => (
+                    <div key={f.id} className="memory-item">
+                      <span className={`memory-chip memory-chip-${f.category}`}>{f.category}</span>
+                      <span className="memory-text">{f.text}</span>
+                      {onForgetFact ? (
+                        <button
+                          type="button"
+                          className="memory-forget"
+                          onClick={() => onForgetFact(f.id)}
+                          title="Forget this"
+                          aria-label="Forget this"
+                        >
+                          ✕
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+                {onClearMemory ? (
+                  <button type="button" className="memory-clear" onClick={onClearMemory}>
+                    Forget everything
+                  </button>
+                ) : null}
+              </>
+            )
+          ) : null}
         </div>
 
         {/* ============ Behaviour ============ */}
